@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '../auth'
 
+const key = 'cubic-discord-session-v2'
 const session = {
   accessToken: 'a'.repeat(64),
   clientToken: 'test-client',
@@ -13,123 +14,123 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-describe('account session lifecycle', () => {
-  it('refreshes a temporarily invalid session after a username change', async () => {
-    sessionStorage.setItem('cubic-account-session-v1', JSON.stringify(session))
-    const next = {
-      ...session,
-      accessToken: 'c'.repeat(64),
-      selectedProfile: { ...session.selectedProfile, name: 'NewName' },
-    }
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn<typeof fetch>()
-        .mockResolvedValueOnce(
-          Response.json({ error: 'ForbiddenOperationException' }, { status: 403 }),
-        )
-        .mockResolvedValueOnce(Response.json(next)),
-    )
-    const store = useAuthStore()
-    await store.restore()
-    expect(store.profile?.name).toBe('NewName')
-    expect(JSON.parse(sessionStorage.getItem('cubic-account-session-v1')!).accessToken).toBe(
-      next.accessToken,
-    )
-  })
-  it('keeps a valid session when the current password is incorrect on an account change', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn<typeof fetch>()
-        .mockResolvedValueOnce(Response.json(session))
-        .mockResolvedValueOnce(
-          Response.json(
-            { error: 'ForbiddenOperationException', errorMessage: 'Invalid credentials.' },
-            { status: 403 },
-          ),
-        ),
-    )
-    const store = useAuthStore()
-    await store.login('TestPlayer', 'password')
-    await expect(store.changeUsername('NewName', 'bad')).rejects.toMatchObject({
-      status: 403,
-      message: 'La contraseña actual no es correcta.',
+describe('Discord session lifecycle', () => {
+  it('exchanges a callback ticket using the initiating tab secret, then removes that secret', async () => {
+    sessionStorage.setItem('cubic-discord-verifier', 'f'.repeat(64))
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ session }))
+    vi.stubGlobal('fetch', fetcher)
+    await useAuthStore().finishDiscord('c'.repeat(64))
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      code: 'c'.repeat(64),
+      verifier: 'f'.repeat(64),
     })
-    expect(store.session?.accessToken).toBe(session.accessToken)
+    expect(sessionStorage.getItem('cubic-discord-verifier')).toBeNull()
+    expect(useAuthStore().session).toEqual(session)
+    expect(sessionStorage.getItem(key)).not.toContain('verifier')
   })
-  it('logs in and restores a validated session without storing the password', async () => {
+  it('rejects copied callback links without contacting the server', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', fetcher)
+    await expect(useAuthStore().finishDiscord('c'.repeat(64))).rejects.toMatchObject({
+      code: 'DiscordStateExpired',
+    })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+  it('does not create a session until a new Discord user chooses a player name', async () => {
+    sessionStorage.setItem('cubic-discord-verifier', 'f'.repeat(64))
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json({ registrationToken: 'e'.repeat(64) }))
+        .mockResolvedValueOnce(Response.json({ session })),
+    )
+    const store = useAuthStore()
+    expect(await store.finishDiscord('c'.repeat(64))).toBe('e'.repeat(64))
+    expect(store.session).toBeNull()
+    await store.registerDiscord('TestPlayer', 'e'.repeat(64))
+    expect(store.session).toEqual(session)
+  })
+  it('ignores old email sessions and validates only new web sessions', async () => {
+    sessionStorage.setItem('cubic-account-session-v1', JSON.stringify(session))
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetcher)
+    await useAuthStore().restore()
+    expect(fetcher).not.toHaveBeenCalled()
+    sessionStorage.setItem(key, JSON.stringify(session))
+    await useAuthStore().restore(true)
+    expect(useAuthStore().session).toEqual(session)
+    expect(fetcher.mock.calls[0]?.[0]).toContain('/account/session/validate')
+  })
+  it('keeps launcher credentials out of browser storage', async () => {
+    sessionStorage.setItem(key, JSON.stringify(session))
     const fetcher = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(Response.json(session))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          token: 'e'.repeat(64),
+          username: 'TestPlayer',
+          expiresAt: '2027-01-01T00:00:00Z',
+        }),
+      )
     vi.stubGlobal('fetch', fetcher)
-    await useAuthStore().login('TestPlayer', 'secret-password')
-    expect(useAuthStore().profile?.id).toBe(session.selectedProfile.id)
-    expect(sessionStorage.getItem('cubic-account-session-v1')).not.toContain('secret-password')
-    setActivePinia(createPinia())
-    await useAuthStore().restore()
-    expect(useAuthStore().session).toEqual(session)
-    expect(fetcher.mock.calls[1]?.[0]).toContain('/authserver/validate')
+    const store = useAuthStore()
+    await store.restore()
+    expect((await store.generateLauncherToken()).token).toBe('e'.repeat(64))
+    expect(new Headers(fetcher.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer ' + session.accessToken,
+    )
+    expect(JSON.stringify(sessionStorage)).not.toContain('e'.repeat(64))
   })
-  it('clears expired sessions but keeps the saved candidate on a temporary outage', async () => {
-    sessionStorage.setItem('cubic-account-session-v1', JSON.stringify(session))
+  it('clears expired sessions but preserves the saved candidate on a temporary outage', async () => {
+    sessionStorage.setItem(key, JSON.stringify(session))
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(Response.json({ error: 'ServiceUnavailable' }, { status: 503 })),
+      vi
+        .fn()
+        .mockResolvedValue(Response.json({ error: 'ServiceUnavailable' }, { status: 503 })),
     )
     const store = useAuthStore()
     await store.restore()
     expect(store.session).toBeNull()
     expect(store.restoreError).toBeTruthy()
-    expect(sessionStorage.getItem('cubic-account-session-v1')).not.toBeNull()
+    expect(sessionStorage.getItem(key)).not.toBeNull()
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({ error: 'ForbiddenOperationException' }, { status: 403 }),
-        ),
+      vi.fn().mockResolvedValue(Response.json({ error: 'Unauthorized' }, { status: 401 })),
     )
     await store.restore(true)
-    expect(store.session).toBeNull()
-    expect(sessionStorage.getItem('cubic-account-session-v1')).toBeNull()
+    expect(sessionStorage.getItem(key)).toBeNull()
   })
-  it('clears revoked sessions when a protected skin operation fails', async () => {
+  it('clears revoked sessions after a protected skin operation', async () => {
+    sessionStorage.setItem(key, JSON.stringify(session))
     vi.stubGlobal(
       'fetch',
       vi
         .fn()
-        .mockResolvedValueOnce(Response.json(session))
+        .mockResolvedValueOnce(new Response(null, { status: 204 }))
         .mockResolvedValueOnce(Response.json({ error: 'Unauthorized' }, { status: 401 })),
     )
     const store = useAuthStore()
-    await store.login('TestPlayer', 'password')
+    await store.restore()
     await expect(store.deleteSkin()).rejects.toMatchObject({ status: 401 })
     expect(store.session).toBeNull()
-    expect(store.notice).toContain('caducó')
   })
   it('removes local credentials even when logout cannot reach the server', async () => {
+    sessionStorage.setItem(key, JSON.stringify(session))
     vi.stubGlobal(
       'fetch',
       vi
         .fn()
-        .mockResolvedValueOnce(Response.json(session))
+        .mockResolvedValueOnce(new Response(null, { status: 204 }))
         .mockRejectedValueOnce(new TypeError('offline')),
     )
     const store = useAuthStore()
-    await store.login('TestPlayer', 'password')
+    await store.restore()
     await store.logout()
     expect(store.session).toBeNull()
-    expect(sessionStorage.getItem('cubic-account-session-v1')).toBeNull()
+    expect(sessionStorage.getItem(key)).toBeNull()
     expect(store.notice).toContain('revocación')
-  })
-  it('discards malformed stored sessions without contacting the API', async () => {
-    const fetcher = vi.fn<typeof fetch>()
-    vi.stubGlobal('fetch', fetcher)
-    sessionStorage.setItem('cubic-account-session-v1', '{"accessToken":"fake"}')
-    await useAuthStore().restore()
-    expect(fetcher).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem('cubic-account-session-v1')).toBeNull()
   })
 })

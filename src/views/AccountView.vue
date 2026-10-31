@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   PhUserCircle,
-  PhEnvelopeSimple,
-  PhShieldCheck,
+  PhDiscordLogo,
   PhClockCounterClockwise,
-  PhPencilSimple,
-  PhLockKey,
   PhArrowRight,
+  PhKey,
 } from '@phosphor-icons/vue'
 import { errorInfo } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -17,30 +15,20 @@ import NoticeMessage from '@/components/NoticeMessage.vue'
 import AnimatedModal from '@/components/AnimatedModal.vue'
 
 const auth = useAuthStore()
-const loading = ref(false),
-  busy = ref(false),
-  success = ref('')
+const route = useRoute(),
+  router = useRouter()
+const busy = ref(false),
+  loading = ref(false),
+  editOpen = ref(false),
+  nextName = ref('')
 const failure = ref({ message: '', diagnostic: '' }),
-  editError = ref({ message: '', diagnostic: '' })
-const editing = ref<'username' | 'email' | 'password' | null>(null),
-  editOpen = ref(false)
-const nextValue = ref(''),
-  password = ref(''),
-  confirmPassword = ref('')
-const modalTitle = computed(
-  () =>
-    ({
-      username: 'Cambiar nombre de Minecraft',
-      email: 'Cambiar correo electrónico',
-      password: 'Cambiar contraseña',
-    })[editing.value ?? 'username'],
-)
+  success = ref('')
+const credential = ref<{ token: string; username: string; expiresAt: string } | null>(null)
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(value))
-
 async function load() {
   loading.value = true
-  failure.value = { message: '', diagnostic: '' }
   try {
     await auth.loadAccount()
   } catch (error) {
@@ -49,59 +37,57 @@ async function load() {
     loading.value = false
   }
 }
-function edit(kind: 'username' | 'email' | 'password') {
-  editing.value = kind
-  nextValue.value =
-    kind === 'username'
-      ? (auth.profile?.name ?? '')
-      : kind === 'email'
-        ? (auth.account?.email ?? '')
-        : ''
-  password.value = confirmPassword.value = ''
-  editError.value = { message: '', diagnostic: '' }
-  editOpen.value = true
-}
-watch(editOpen, (open) => {
-  if (!open) password.value = confirmPassword.value = ''
-})
-async function save() {
-  if (busy.value || !editing.value) return
-  if (editing.value === 'password' && nextValue.value !== confirmPassword.value) {
-    editError.value = { message: 'Las contraseñas nuevas no coinciden.', diagnostic: '' }
-    return
-  }
-  if (editing.value === 'password' && nextValue.value === password.value) {
-    editError.value = { message: 'Elegí una contraseña distinta de la actual.', diagnostic: '' }
-    return
-  }
+async function generate() {
   busy.value = true
-  editError.value = { message: '', diagnostic: '' }
-  success.value = ''
+  failure.value = { message: '', diagnostic: '' }
   try {
-    if (editing.value === 'username') {
-      await auth.changeUsername(nextValue.value.trim(), password.value)
-      success.value =
-        'Nombre actualizado. Conservás el mismo UUID; el launcher debe renovar la sesión para obtener el nuevo nombre.'
-    } else if (editing.value === 'email') {
-      await auth.changeEmail(nextValue.value.trim(), password.value)
-      success.value =
-        'Cambio de correo solicitado. Revisá el correo nuevo y, si se solicita, el actual para confirmar el cambio.'
-    } else {
-      await auth.changePassword(password.value, nextValue.value)
-      success.value =
-        'Contraseña actualizada. Las sesiones anteriores se cerraron y esta pestaña usa una sesión nueva.'
-    }
-    password.value = confirmPassword.value = ''
-    nextValue.value = ''
-    editOpen.value = false
-    await load()
+    credential.value = await auth.generateLauncherToken()
+    clearTimeout(expiryTimer)
+    expiryTimer = setTimeout(
+      () => {
+        credential.value = null
+      },
+      Math.max(0, new Date(credential.value.expiresAt).getTime() - Date.now()),
+    )
   } catch (error) {
-    editError.value = errorInfo(error)
+    failure.value = errorInfo(error)
   } finally {
     busy.value = false
   }
 }
-onMounted(load)
+async function rename() {
+  busy.value = true
+  failure.value = { message: '', diagnostic: '' }
+  try {
+    await auth.changeUsername(nextName.value.trim())
+    credential.value = null
+    editOpen.value = false
+    success.value =
+      'Nombre actualizado. Conservás tu UUID; volvé a entrar en el launcher para actualizar el nombre.'
+    await load()
+  } catch (error) {
+    failure.value = errorInfo(error)
+  } finally {
+    busy.value = false
+  }
+}
+async function signoutAll() {
+  busy.value = true
+  try {
+    await auth.signoutAll()
+  } catch (error) {
+    failure.value = errorInfo(error)
+  } finally {
+    busy.value = false
+  }
+}
+onMounted(async () => {
+  const generateAfterLogin = route.query.launcher === '1'
+  if (generateAfterLogin) await router.replace('/account')
+  await load()
+  if (generateAfterLogin && auth.session) await generate()
+})
+onBeforeUnmount(() => clearTimeout(expiryTimer))
 </script>
 
 <template>
@@ -109,9 +95,7 @@ onMounted(load)
     <NoticeMessage kind="error" v-bind="failure" /><NoticeMessage
       kind="success"
       :message="success"
-    /><button v-if="failure.message" class="button" :disabled="loading" @click="load">
-      Volver a cargar cuenta
-    </button>
+    />
   </div>
   <div class="settings-grid">
     <section class="panel identity-panel">
@@ -119,21 +103,21 @@ onMounted(load)
         <PhUserCircle :size="22" />
         <div>
           <h2>Tu perfil</h2>
-          <p>Tu identidad de Minecraft, en un solo lugar.</p>
+          <p>Tu identidad de Minecraft.</p>
         </div>
       </div>
       <div class="identity-name">
-        <span class="profile-initial">{{ auth.profile?.name.slice(0, 1).toUpperCase() }}</span>
-        <div>
-          <strong>{{ auth.profile?.name }}</strong
-          ><span>Cuenta de CubicLauncher</span>
-        </div>
+        <span class="profile-initial">{{ auth.profile?.name.slice(0, 1).toUpperCase() }}</span
+        ><strong>{{ auth.profile?.name }}</strong>
         <button
           class="button button-small"
-          :disabled="loading || !auth.account"
-          @click="edit('username')"
+          :disabled="busy"
+          @click="
+            nextName = auth.profile?.name ?? '';
+            editOpen = true
+          "
         >
-          <PhPencilSimple :size="14" /> Cambiar nombre
+          Cambiar nombre
         </button>
       </div>
       <dl class="profile-data">
@@ -145,9 +129,10 @@ onMounted(load)
           </dd>
         </div>
         <div>
-          <dt>Correo electrónico</dt>
-          <dd class="email-detail">
-            <span>{{ auth.account?.email ?? (loading ? 'Cargando…' : '—') }}</span>
+          <dt>Discord vinculado</dt>
+          <dd>
+            <PhDiscordLogo :size="16" />
+            {{ auth.account?.discordId ?? (loading ? 'Cargando…' : '—') }}
           </dd>
         </div>
         <div v-if="auth.account?.createdAt">
@@ -158,7 +143,7 @@ onMounted(load)
       <div class="profile-skin-link">
         <div>
           <strong>Tu skin, tu estilo.</strong>
-          <p>Probá y guardá tu apariencia en el editor 3D.</p>
+          <p>Personalizá tu apariencia en el editor 3D.</p>
         </div>
         <RouterLink to="/account/skin" class="button"
           >Personalizar <PhArrowRight :size="14"
@@ -167,65 +152,66 @@ onMounted(load)
     </section>
     <section class="panel security-panel">
       <div class="panel-heading">
-        <PhShieldCheck :size="22" />
+        <PhKey :size="22" />
         <div>
-          <h2>Acceso y seguridad</h2>
-          <p>Administrá cómo entrás a tu cuenta.</p>
+          <h2>Entrar al launcher</h2>
+          <p>Generá un token y pegalo como contraseña.</p>
         </div>
       </div>
-      <div class="security-row">
-        <PhEnvelopeSimple :size="20" />
-        <div>
-          <h3>Correo electrónico</h3>
-          <p>Los cambios pueden requerir confirmación en tu correo actual y en el nuevo.</p>
+      <p>
+        Usá tu nombre de Minecraft y este token en el launcher. Vence en una hora y solo se
+        puede usar una vez. La sesión del juego continúa después de usarlo.
+      </p>
+      <button class="button button-primary button-full" :disabled="busy" @click="generate">
+        {{
+          busy
+            ? 'Un momento…'
+            : credential
+              ? 'Generar otro token'
+              : 'Generar token para el launcher'
+        }}
+      </button>
+      <div v-if="credential" class="launcher-credential" aria-live="polite">
+        <label>Usuario</label>
+        <div class="copy-row">
+          <code>{{ credential.username }}</code
+          ><CopyButton :value="credential.username" label="Copiar usuario" />
         </div>
-        <button
-          class="button button-small"
-          :disabled="loading || !auth.account"
-          @click="edit('email')"
-        >
-          Cambiar correo
-        </button>
-      </div>
-      <NoticeMessage
-        v-if="auth.account?.pendingEmail"
-        :message="`Pendiente de confirmar: ${auth.account.pendingEmail}. El cambio todavía no se completó.`"
-      />
-      <div class="security-row">
-        <PhLockKey :size="20" />
-        <div>
-          <h3>Contraseña</h3>
-          <p>Al cambiarla, se revocan las sesiones anteriores.</p>
+        <label>Token (contraseña)</label>
+        <div class="copy-row">
+          <code class="launcher-token">{{ credential.token }}</code
+          ><CopyButton :value="credential.token" label="Copiar token" />
         </div>
-        <button
-          class="button button-small"
-          :disabled="loading || !auth.account"
-          @click="edit('password')"
-        >
-          Cambiar contraseña
-        </button>
+        <p class="field-hint">
+          Vence a las
+          {{
+            new Date(credential.expiresAt).toLocaleTimeString('es', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          }}. Generar otro invalida el anterior.
+        </p>
       </div>
+      <p class="field-hint">
+        El token solo se muestra en esta página.
+      </p>
+      <button class="button button-small" :disabled="busy" @click="signoutAll">
+        Cerrar todas las sesiones
+      </button>
     </section>
     <section class="panel history-panel">
       <div class="panel-heading">
         <PhClockCounterClockwise :size="22" />
         <div>
           <h2>Historial de nombres</h2>
-          <p>Los cambios quedan vinculados a tu UUID, que siempre es el mismo.</p>
+          <p>Tu UUID se conserva cuando cambiás de nombre.</p>
         </div>
-        <span v-if="auth.account" class="badge"
-          >{{ auth.account.historyTotal }}
-          {{ auth.account.historyTotal === 1 ? 'cambio' : 'cambios' }}</span
-        >
       </div>
       <p v-if="!auth.account?.nameHistory.length" class="history-empty">
-        {{ loading ? 'Cargando historial…' : 'Todavía no hay cambios de nombre registrados.' }}
+        {{ loading ? 'Cargando historial…' : 'Todavía no hay cambios de nombre.' }}
       </p>
       <ul v-else class="name-history">
-        <li
-          v-for="item in auth.account.nameHistory"
-          :key="`${item.changedAt}:${item.previousName}`"
-        >
+        <li v-for="(item, index) in auth.account.nameHistory" :key="index">
           <div>
             <span class="previous-name">{{ item.previousName }}</span
             ><PhArrowRight :size="14" /><strong>{{ item.newName }}</strong>
@@ -234,69 +220,47 @@ onMounted(load)
         </li>
       </ul>
       <p v-if="auth.account && auth.account.historyTotal > 20" class="field-hint">
-        Mostrando los últimos 20 cambios. El historial completo permanece guardado.
+        Mostrando los últimos 20 cambios.
       </p>
     </section>
   </div>
-  <AnimatedModal v-model:open="editOpen" :title="modalTitle" :busy="busy">
-    <form id="account-edit" class="account-edit-form" @submit.prevent="save">
-      <NoticeMessage kind="error" v-bind="editError" />
-      <p v-if="editing === 'username'" class="muted">
-        El UUID se mantiene. El nombre anterior quedará en tu historial.
-      </p>
-      <p v-if="editing === 'email'" class="muted">
-        Supabase enviará los enlaces de confirmación según la configuración del servicio.
-      </p>
-      <div class="field">
-        <label for="account-new-value">{{
-          editing === 'username'
-            ? 'Nuevo nombre de Minecraft'
-            : editing === 'email'
-              ? 'Nuevo correo'
-              : 'Nueva contraseña'
-        }}</label
-        ><input
-          id="account-new-value"
-          v-model="nextValue"
-          :type="editing === 'email' ? 'email' : editing === 'password' ? 'password' : 'text'"
-          :pattern="editing === 'username' ? '[A-Za-z0-9_]{3,16}' : undefined"
-          :minlength="editing === 'password' ? 10 : undefined"
-          :maxlength="editing === 'username' ? 16 : editing === 'email' ? 254 : 1024"
-          :autocomplete="
-            editing === 'password' ? 'new-password' : editing === 'email' ? 'email' : 'username'
-          "
-          :disabled="busy"
-          required
-        /><span v-if="editing === 'username'" class="field-hint"
-          >3–16 letras, números o guiones bajos.</span
-        >
-      </div>
-      <label v-if="editing === 'password'" class="field" for="account-confirm-password"
-        >Confirmar nueva contraseña<input
-          id="account-confirm-password"
-          v-model="confirmPassword"
-          type="password"
-          autocomplete="new-password"
-          :disabled="busy"
-          maxlength="1024"
-          required
-      /></label>
-      <label class="field" for="account-current-password"
-        >Contraseña actual<input
-          id="account-current-password"
-          v-model="password"
-          type="password"
-          autocomplete="current-password"
-          :disabled="busy"
-          maxlength="1024"
-          required
-      /></label>
+  <AnimatedModal v-model:open="editOpen" title="Cambiar nombre de Minecraft" :busy="busy">
+    <form @submit.prevent="rename">
+      <NoticeMessage kind="error" v-bind="failure" /><label class="field" for="next-name"
+        >Nuevo nombre<input
+          id="next-name"
+          v-model="nextName"
+          pattern="[A-Za-z0-9_]{3,16}"
+          minlength="3"
+          maxlength="16"
+          required /></label
+      ><button class="button button-primary" :disabled="busy" type="submit">
+        Guardar nombre
+      </button>
     </form>
-    <template #footer
-      ><button class="button" :disabled="busy" @click="editOpen = false">Cancelar</button
-      ><button form="account-edit" type="submit" class="button button-primary" :disabled="busy">
-        <span v-if="busy" class="spinner" />{{ busy ? 'Guardando…' : 'Guardar cambio' }}
-      </button></template
-    >
   </AnimatedModal>
 </template>
+
+<style scoped>
+.launcher-credential {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--cl-border);
+  border-radius: var(--radius-lg);
+}
+.launcher-credential label {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+.launcher-token {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.security-panel > p {
+  margin: 1rem 0;
+}
+.security-panel > .button {
+  margin-top: 1rem;
+}
+</style>

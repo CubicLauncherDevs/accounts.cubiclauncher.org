@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('API errors and texture payloads', () => {
   it.each([
     ['AccountBanned', 'Tu cuenta está suspendida.'],
-    ['EmailNotConfirmed', 'Confirmá tu correo para entrar.'],
+    ['DiscordMembershipRequired', 'Tenés que estar en el servidor de Discord'],
   ])(
     'preserves the actionable %s state instead of reporting an incorrect password',
     async (code, message) => {

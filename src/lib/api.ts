@@ -21,9 +21,7 @@ export interface PlayerSkin {
   model: SkinModel
 }
 export interface AccountDetails {
-  email: string
-  emailConfirmed: boolean
-  pendingEmail: string | null
+  discordId: string
   createdAt: string
   nameHistory: { previousName: string; newName: string; changedAt: string }[]
   historyTotal: number
@@ -33,6 +31,7 @@ export interface FullProfile extends PlayerProfile {
 }
 export interface ServerMetadata {
   meta: { serverName?: string; registrationEnabled?: boolean }
+  discordInviteUrl?: string
 }
 
 export class ApiError extends Error {
@@ -49,25 +48,19 @@ export class ApiError extends Error {
 }
 
 const messages: Record<string, string> = {
+  DiscordMembershipRequired:
+    'Tenés que estar en el servidor de Discord de CubicLauncher para entrar.',
+  DiscordLoginFailed: 'No se pudo autorizar el acceso con Discord. Volvé a intentarlo.',
+  DiscordLoginCancelled: 'Cancelaste el inicio de sesión con Discord.',
+  DiscordStateExpired: 'Este intento de ingreso venció. Volvé a iniciar sesión con Discord.',
+  DiscordUnavailable: 'Discord no está disponible en este momento. Volvé a intentarlo.',
+  RegistrationDisabled: 'Los registros están cerrados por el momento.',
   AccountBanned:
     'Tu cuenta está suspendida. Contactá al equipo de CubicLauncher si necesitás ayuda.',
-  EmailNotConfirmed:
-    'Confirmá tu correo para entrar. Revisá tu bandeja de entrada o pedí un nuevo enlace.',
   TooManyRequests: 'Demasiados intentos. Esperá unos minutos antes de volver a probar.',
-  SupabaseRateLimited:
-    'El servicio está recibiendo demasiadas peticiones. Intentá de nuevo más tarde.',
   ConfigurationError: 'El servicio todavía necesita configuración. Contactá al administrador.',
   DatabaseFunctionMissing: 'La base de datos del servicio todavía no está lista.',
-  SupabaseConnectionFailed:
-    'No se pudo conectar con la base de datos. Intentá de nuevo en un momento.',
-  SupabaseTimeout: 'El servicio tardó demasiado en responder. Intentá de nuevo.',
   UsernameTaken: 'Ese nombre de Minecraft ya está en uso.',
-  EmailUnavailable: 'Ese correo no se puede usar. Elegí otro.',
-  VerificationUnavailable:
-    'No pudimos enviar el correo de verificación. Intentá más tarde o revisá la configuración de correo del servicio.',
-  AuthUpdateUnavailable: 'Supabase no pudo actualizar tu cuenta. Intentá más tarde.',
-  ReauthenticationRequired:
-    'Supabase pide una verificación adicional para este cambio. Revisá la configuración de autenticación.',
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -111,19 +104,12 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     }
     const code = error.error ?? 'RequestFailed'
     let message = messages[code] ?? error.errorMessage ?? 'No se pudo completar la operación.'
-    const accountBlocked = code === 'AccountBanned' || code === 'EmailNotConfirmed'
+    const accountBlocked =
+      code === 'AccountBanned' || code.startsWith('Discord') || code === 'RegistrationDisabled'
     if (accountBlocked) {
-      message = messages[code]!
+      message = messages[code] ?? error.errorMessage ?? message
     } else if (path === '/authserver/authenticate' && response.status === 403) {
-      message = 'Usuario o contraseña incorrectos.'
-    } else if (
-      ['/account/username', '/account/email', '/account/password'].includes(path) &&
-      code === 'ForbiddenOperationException' &&
-      response.status === 403
-    ) {
-      message = 'La contraseña actual no es correcta.'
-    } else if (code === 'ReauthenticationRequired') {
-      message = messages.ReauthenticationRequired!
+      message = 'El token no es válido, ya se usó o venció. Generá otro desde la web.'
     } else if (
       (response.status === 401 || response.status === 403) &&
       path !== '/account/register'
@@ -162,7 +148,14 @@ export function parseSkin(profile: FullProfile): PlayerSkin | null {
     }
     const skin = json.textures?.SKIN
     if (!skin) return null
-    if (typeof skin.url !== 'string' || new URL(skin.url).protocol !== 'https:')
+    if (typeof skin.url !== 'string') throw new Error('Invalid URL')
+    const url = new URL(skin.url)
+    const localDevelopment =
+      import.meta.env.DEV &&
+      url.protocol === 'http:' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) &&
+      url.origin === new URL(API_URL).origin
+    if (url.username || url.password || (url.protocol !== 'https:' && !localDevelopment))
       throw new Error('Invalid URL')
     return { url: skin.url, model: skin.metadata?.model === 'slim' ? 'slim' : 'default' }
   } catch {

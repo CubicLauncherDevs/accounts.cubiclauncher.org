@@ -12,7 +12,8 @@ import {
   type SkinModel,
 } from '@/lib/api'
 
-const STORAGE_KEY = 'cubic-account-session-v1'
+const STORAGE_KEY = 'cubic-discord-session-v2'
+const VERIFIER_KEY = 'cubic-discord-verifier'
 function validSession(value: unknown): value is AuthSession {
   const s = value as AuthSession | null
   return (
@@ -73,7 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
         return
       }
       try {
-        await post('/authserver/validate', {
+        await post('/account/session/validate', {
           accessToken: stored.accessToken,
           clientToken: stored.clientToken,
         })
@@ -82,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (revision !== generation) return
         if (error instanceof ApiError && [401, 403].includes(error.status)) {
           try {
-            const renewed = await post<AuthSession>('/authserver/refresh', {
+            const renewed = await post<AuthSession>('/account/session/refresh', {
               accessToken: stored.accessToken,
               clientToken: stored.clientToken,
             })
@@ -100,13 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
     return restorePromise
   }
 
-  async function login(username: string, password: string) {
-    const result = await post<AuthSession>('/authserver/authenticate', {
-      username: username.trim(),
-      password,
-      clientToken: crypto.randomUUID(),
-      agent: { name: 'Minecraft', version: 1 },
-    })
+  function acceptLogin(result: AuthSession) {
     if (!validSession(result))
       throw new ApiError('El servidor devolvió una sesión inválida.', 502, 'InvalidSession')
     generation++
@@ -117,6 +112,57 @@ export const useAuthStore = defineStore('auth', () => {
     restoreError.value = null
     notice.value = ''
     persist(result)
+  }
+
+  async function startDiscord() {
+    const verifier = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('')
+    const challenge = Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))),
+      (b) => b.toString(16).padStart(2, '0'),
+    ).join('')
+    try {
+      sessionStorage.setItem(VERIFIER_KEY, verifier)
+    } catch {
+      throw new ApiError('Permití el almacenamiento de esta pestaña para entrar con Discord.')
+    }
+    const result = await post<{ url: string }>('/discord/start', { challenge })
+    const destination = new URL(result.url)
+    if (
+      destination.origin !== 'https://discord.com' ||
+      destination.pathname !== '/oauth2/authorize'
+    )
+      throw new ApiError('El servidor devolvió un enlace de Discord inválido.')
+    window.location.assign(result.url)
+  }
+
+  async function finishDiscord(code: string) {
+    clear()
+    const verifier = sessionStorage.getItem(VERIFIER_KEY)
+    sessionStorage.removeItem(VERIFIER_KEY)
+    if (!verifier)
+      throw new ApiError(
+        'Volvé a iniciar sesión con Discord desde esta pestaña.',
+        403,
+        'DiscordStateExpired',
+      )
+    const result = await post<{ session?: AuthSession; registrationToken?: string }>(
+      '/discord/exchange',
+      { code, verifier },
+    )
+    if (result.session) acceptLogin(result.session)
+    else if (!result.registrationToken)
+      throw new ApiError('El servidor devolvió una respuesta inválida.')
+    return result.registrationToken
+  }
+
+  async function registerDiscord(username: string, registrationToken: string) {
+    const result = await post<{ session: AuthSession }>('/discord/register', {
+      username,
+      registrationToken,
+    })
+    acceptLogin(result.session)
   }
 
   async function loadProfile() {
@@ -137,7 +183,10 @@ export const useAuthStore = defineStore('auth', () => {
     const headers = new Headers(options.headers)
     headers.set('Authorization', `Bearer ${current.accessToken}`)
     try {
-      await request(`/api/user/profile/${current.selectedProfile.id}/skin`, { ...options, headers })
+      await request(`/api/user/profile/${current.selectedProfile.id}/skin`, {
+        ...options,
+        headers,
+      })
     } catch (error) {
       if (error instanceof ApiError && [401, 403].includes(error.status)) {
         clear()
@@ -170,8 +219,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function accountRequest<T>(path: string, body?: unknown): Promise<T> {
-    if (!session.value) throw new ApiError('Iniciá sesión para continuar.', 401, 'SessionExpired')
-    const headers: Record<string, string> = { Authorization: `Bearer ${session.value.accessToken}` }
+    if (!session.value)
+      throw new ApiError('Iniciá sesión para continuar.', 401, 'SessionExpired')
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${session.value.accessToken}`,
+    }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     try {
       return await request<T>(path, {
@@ -193,24 +245,22 @@ export const useAuthStore = defineStore('auth', () => {
     const details = await accountRequest<AccountDetails>('/account/me')
     if (revision === generation && session.value) account.value = details
   }
-  async function changeUsername(username: string, currentPassword: string) {
+  async function changeUsername(username: string) {
     const result = await accountRequest<{ session: AuthSession }>('/account/username', {
       username,
-      currentPassword,
     })
     replaceSession(result.session)
     account.value = null
   }
-  async function changeEmail(email: string, currentPassword: string) {
-    await accountRequest('/account/email', { email, currentPassword })
-    account.value = null
+  async function generateLauncherToken() {
+    return accountRequest<{ token: string; username: string; expiresAt: string }>(
+      '/account/launcher-token',
+      {},
+    )
   }
-  async function changePassword(currentPassword: string, newPassword: string) {
-    const result = await accountRequest<{ session: AuthSession }>('/account/password', {
-      currentPassword,
-      newPassword,
-    })
-    replaceSession(result.session)
+  async function signoutAll() {
+    await accountRequest('/account/signout-all', {})
+    clear()
   }
 
   async function logout() {
@@ -218,7 +268,7 @@ export const useAuthStore = defineStore('auth', () => {
     clear()
     if (token) {
       try {
-        await post('/authserver/invalidate', { accessToken: token })
+        await post('/account/session/logout', { accessToken: token })
       } catch {
         notice.value =
           'Cerramos la sesión en esta pestaña. El servidor no pudo confirmar la revocación.'
@@ -237,14 +287,16 @@ export const useAuthStore = defineStore('auth', () => {
     restoreError,
     notice,
     restore,
-    login,
+    startDiscord,
+    finishDiscord,
+    registerDiscord,
     logout,
     loadProfile,
     saveSkin,
     deleteSkin,
     loadAccount,
     changeUsername,
-    changeEmail,
-    changePassword,
+    generateLauncherToken,
+    signoutAll,
   }
 })

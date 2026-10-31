@@ -9,14 +9,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/AuthView.vue'),
-      props: { mode: 'login' },
       meta: { guest: true, title: 'Entrar' },
     },
     {
       path: '/register',
       name: 'register',
       component: () => import('@/views/AuthView.vue'),
-      props: { mode: 'register' },
       meta: { guest: true, title: 'Crear cuenta' },
     },
     {
@@ -52,7 +50,8 @@ router.beforeEach(async (to) => {
   await auth.restore()
   if (to.hash === '#register' && !auth.session) return '/register'
   if (to.meta.requiresAuth && !auth.session) return { path: '/login', query: { next: to.path } }
-  if (to.meta.guest && auth.session) return '/account'
+  const oauthCallback = to.path === '/login' && /^#(?:code|error)=/.test(to.hash)
+  if (to.meta.guest && auth.session && !oauthCallback) return '/account'
 })
 router.afterEach((to) => {
   document.title = `${to.meta.title ?? 'Cuentas'} · CubicLauncher`

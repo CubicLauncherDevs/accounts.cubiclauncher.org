@@ -1,9 +1,9 @@
+import { createHash } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
 import type { Page } from '@playwright/test'
 
 export const API = 'https://auth.cubiclauncher.org'
-export const TEXTURE =
-  'https://jsfuiarusrvydgwdacbk.supabase.co/storage/v1/object/public/skins/test-skin'
+export const TEXTURE = API + '/textures/' + 'f'.repeat(64)
 export const session = {
   accessToken: 'a'.repeat(64),
   clientToken: 'client-e2e',
@@ -50,11 +50,7 @@ export function png(height = 64) {
 
 export async function mockApi(
   page: Page,
-  options: {
-    loginError?: boolean | 'banned' | 'unconfirmed'
-    confirmation?: boolean
-    registration?: boolean
-  } = {},
+  options: { loginError?: 'banned' | 'membership'; newAccount?: boolean } = {},
 ) {
   const state = {
     hasSkin: true,
@@ -63,10 +59,9 @@ export async function mockApi(
     deletes: 0,
     registrations: 0,
     invalidations: 0,
+    tokens: 0,
     name: 'TestPlayer',
-    pendingEmail: null as string | null,
-    passwordChanges: 0,
-    verifications: 0,
+    challenge: '',
     history: [] as { previousName: string; newName: string; changedAt: string }[],
   }
   const cors = {
@@ -74,6 +69,12 @@ export async function mockApi(
     'access-control-allow-headers': 'content-type, authorization',
     'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
   }
+  await page.route('https://discord.com/oauth2/authorize?**', (route) =>
+    route.fulfill({
+      status: 302,
+      headers: { location: 'http://127.0.0.1:4173/login#code=' + 'c'.repeat(64) },
+    }),
+  )
   await page.route(`${API}/**`, async (route) => {
     const req = route.request(),
       path = new URL(req.url()).pathname
@@ -86,43 +87,67 @@ export async function mockApi(
       })
     const empty = () => route.fulfill({ status: 204, headers: cors })
     if (req.method() === 'OPTIONS') return empty()
-    if (path === '/') return json({ meta: { registrationEnabled: options.registration !== false } })
-    if (path === '/authserver/authenticate') {
-      const error =
-        options.loginError === 'banned'
-          ? 'AccountBanned'
-          : options.loginError === 'unconfirmed'
-            ? 'EmailNotConfirmed'
-            : 'ForbiddenOperationException'
-      return options.loginError
-        ? json({ error, errorMessage: 'Authentication rejected.' }, 403)
-        : json(session)
+    if (path === '/')
+      return json({
+        meta: { registrationEnabled: true },
+        discordInviteUrl: 'https://discord.com/invite/7VaqSrPukm',
+      })
+    if (path === '/discord/start') {
+      state.challenge = req.postDataJSON().challenge
+      return json({
+        url: 'https://discord.com/oauth2/authorize?client_id=111&state=test-state',
+      })
     }
-    if (path === '/authserver/validate') return empty()
-    if (path === '/authserver/invalidate') {
+    if (path === '/discord/exchange') {
+      if (
+        createHash('sha256').update(req.postDataJSON().verifier).digest('hex') !==
+        state.challenge
+      )
+        return json({ error: 'DiscordStateExpired' }, 403)
+      if (options.loginError)
+        return json(
+          {
+            error:
+              options.loginError === 'banned' ? 'AccountBanned' : 'DiscordMembershipRequired',
+          },
+          403,
+        )
+      return options.newAccount
+        ? json({ registrationToken: 'd'.repeat(64) })
+        : json({ session })
+    }
+    if (path === '/discord/register') {
+      state.registrations++
+      state.name = req.postDataJSON().username
+      return json({
+        session: {
+          ...session,
+          selectedProfile: { ...session.selectedProfile, name: state.name },
+        },
+      })
+    }
+    if (path === '/account/session/validate') return empty()
+    if (path === '/account/session/logout' || path === '/account/signout-all') {
       state.invalidations++
       return empty()
     }
-    if (path === '/account/register') {
-      state.registrations++
-      return json({ emailConfirmationRequired: options.confirmation ?? false }, 202)
+    if (path === '/account/launcher-token') {
+      state.tokens++
+      return json({
+        token: String(state.tokens).repeat(64),
+        username: state.name,
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      })
     }
     if (path === '/account/me')
       return json({
-        email: 'test@example.com',
-        emailConfirmed: true,
-        pendingEmail: state.pendingEmail,
+        discordId: '333',
         createdAt: '2026-01-10T12:00:00Z',
         nameHistory: state.history,
         historyTotal: state.history.length,
       })
     if (path === '/account/username') {
       const body = req.postDataJSON()
-      if (body.currentPassword !== 'test-password-only')
-        return json(
-          { error: 'ForbiddenOperationException', errorMessage: 'Invalid credentials.' },
-          403,
-        )
       state.history.unshift({
         previousName: state.name,
         newName: body.username,
@@ -136,24 +161,6 @@ export async function mockApi(
           selectedProfile: { ...session.selectedProfile, name: state.name },
         },
       })
-    }
-    if (path === '/account/email') {
-      state.pendingEmail = req.postDataJSON().email
-      return json({ message: 'Pending confirmation' })
-    }
-    if (path === '/account/password') {
-      state.passwordChanges++
-      return json({
-        session: {
-          ...session,
-          accessToken: 'd'.repeat(64),
-          selectedProfile: { ...session.selectedProfile, name: state.name },
-        },
-      })
-    }
-    if (path === '/account/resend-verification') {
-      state.verifications++
-      return json({ message: 'Check email' }, 202)
     }
     if (path.startsWith('/sessionserver/session/minecraft/profile/'))
       return json({
@@ -183,7 +190,7 @@ export async function mockApi(
       state.hasSkin = false
       return empty()
     }
-    return json({ error: 'NotFound', errorMessage: `Unexpected test route ${path}` }, 404)
+    return json({ error: 'NotFound', errorMessage: 'Unexpected test route ' + path }, 404)
   })
   await page.route(TEXTURE, (route) =>
     route.fulfill({ contentType: 'image/png', headers: cors, body: png() }),
@@ -193,8 +200,6 @@ export async function mockApi(
 
 export async function login(page: Page) {
   await page.goto('/login')
-  await page.getByLabel('Correo o nombre de Minecraft').fill('TestPlayer')
-  await page.getByLabel('Contraseña', { exact: true }).fill('test-password-only')
-  await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click()
+  await page.getByRole('button', { name: 'Continuar con Discord' }).click()
   await page.waitForURL('**/account')
 }
