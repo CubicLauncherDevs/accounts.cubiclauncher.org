@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import {
   PhUserCircle,
   PhDiscordLogo,
@@ -15,8 +15,6 @@ import NoticeMessage from '@/components/NoticeMessage.vue'
 import AnimatedModal from '@/components/AnimatedModal.vue'
 
 const auth = useAuthStore()
-const route = useRoute(),
-  router = useRouter()
 const busy = ref(false),
   loading = ref(false),
   editOpen = ref(false),
@@ -98,12 +96,7 @@ async function signoutAll() {
     busy.value = false
   }
 }
-onMounted(async () => {
-  const generateAfterLogin = route.query.launcher === '1'
-  if (generateAfterLogin) await router.replace('/account')
-  await load()
-  if (generateAfterLogin && auth.session) await generate()
-})
+onMounted(load)
 onBeforeUnmount(() => {
   clearTimeout(expiryTimer)
   clearTimeout(copyTimer)

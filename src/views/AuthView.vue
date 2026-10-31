@@ -56,7 +56,7 @@ async function register() {
   try {
     await auth.registerDiscord(username.value.trim(), registrationToken.value)
     registrationToken.value = ''
-    await router.replace('/account?launcher=1')
+    await router.replace('/account')
   } catch (error) {
     failure.value = errorInfo(error)
     if (error instanceof ApiError && error.code === 'DiscordStateExpired')
@@ -81,7 +81,7 @@ onMounted(async () => {
     busy.value = true
     try {
       registrationToken.value = (await auth.finishDiscord(code)) ?? ''
-      if (auth.session) await router.replace('/account?launcher=1')
+      if (auth.session) await router.replace('/account')
     } catch (error) {
       failure.value = errorInfo(error)
     } finally {
