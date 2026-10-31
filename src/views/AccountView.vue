@@ -149,6 +149,8 @@ onBeforeUnmount(() => {
           </dd>
         </div>
         <div>
+          <dt>Correo de Discord</dt>
+          <dd>{{ auth.account?.discordEmail ?? (loading ? 'Cargando…' : 'No disponible') }}</dd>
           <dt>Discord vinculado</dt>
           <dd>
             <PhDiscordLogo :size="16" />

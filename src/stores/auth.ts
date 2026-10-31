@@ -14,6 +14,7 @@ import {
 
 const STORAGE_KEY = 'cubic-discord-session-v2'
 const VERIFIER_KEY = 'cubic-discord-verifier'
+const MIGRATION_KEY = 'cubic-legacy-migration'
 function validSession(value: unknown): value is AuthSession {
   const s = value as AuthSession | null
   return (
@@ -114,7 +115,12 @@ export const useAuthStore = defineStore('auth', () => {
     persist(result)
   }
 
-  async function startDiscord() {
+  async function migrateLegacy(identifier: string, password: string) {
+    const result = await post<{ token: string }>('/migration/verify', { identifier, password })
+    await startDiscord(result.token)
+  }
+
+  async function startDiscord(migrationToken?: string) {
     const verifier = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
       b.toString(16).padStart(2, '0'),
     ).join('')
@@ -124,6 +130,8 @@ export const useAuthStore = defineStore('auth', () => {
     ).join('')
     try {
       sessionStorage.setItem(VERIFIER_KEY, verifier)
+      if (migrationToken) sessionStorage.setItem(MIGRATION_KEY, migrationToken)
+      else sessionStorage.removeItem(MIGRATION_KEY)
     } catch {
       throw new ApiError('Permití el almacenamiento de esta pestaña para entrar con Discord.')
     }
@@ -140,6 +148,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function finishDiscord(code: string) {
     clear()
     const verifier = sessionStorage.getItem(VERIFIER_KEY)
+    const migrationToken = sessionStorage.getItem(MIGRATION_KEY)
+    sessionStorage.removeItem(MIGRATION_KEY)
     sessionStorage.removeItem(VERIFIER_KEY)
     if (!verifier)
       throw new ApiError(
@@ -149,7 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
       )
     const result = await post<{ session?: AuthSession; registrationToken?: string }>(
       '/discord/exchange',
-      { code, verifier },
+      { code, verifier, ...(migrationToken ? { migrationToken } : {}) },
     )
     if (result.session) acceptLogin(result.session)
     else if (!result.registrationToken)
@@ -288,6 +298,7 @@ export const useAuthStore = defineStore('auth', () => {
     notice,
     restore,
     startDiscord,
+    migrateLegacy,
     finishDiscord,
     registerDiscord,
     logout,

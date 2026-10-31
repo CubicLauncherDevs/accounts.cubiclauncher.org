@@ -21,6 +21,7 @@ export interface PlayerSkin {
   model: SkinModel
 }
 export interface AccountDetails {
+  discordEmail?: string | null
   discordId: string
   createdAt: string
   nameHistory: { previousName: string; newName: string; changedAt: string }[]
@@ -48,8 +49,11 @@ export class ApiError extends Error {
 }
 
 const messages: Record<string, string> = {
-  DiscordMembershipRequired:
-    'Tenés que estar en el servidor de Discord de CubicLauncher para entrar.',
+  MigrationCredentialsInvalid: 'El usuario o la contraseña anterior no son correctos.',
+  MigrationExpired: 'La verificación venció. Volvé a verificar tu cuenta anterior.',
+  MigrationUnavailable: 'No pudimos consultar las cuentas anteriores. Intentá de nuevo.',
+  MigrationProfileMissing: 'No encontramos el perfil de tu cuenta anterior.',
+  LegacyAlreadyLinked: 'Esta cuenta anterior ya está vinculada a otro Discord.',
   DiscordLoginFailed: 'No se pudo autorizar el acceso con Discord. Volvé a intentarlo.',
   DiscordLoginCancelled: 'Cancelaste el inicio de sesión con Discord.',
   DiscordStateExpired: 'Este intento de ingreso venció. Volvé a iniciar sesión con Discord.',
@@ -105,7 +109,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     const code = error.error ?? 'RequestFailed'
     let message = messages[code] ?? error.errorMessage ?? 'No se pudo completar la operación.'
     const accountBlocked =
-      code === 'AccountBanned' || code.startsWith('Discord') || code === 'RegistrationDisabled'
+      code === 'AccountBanned' || code.startsWith('Discord') || code.startsWith('Migration') || code === 'RegistrationDisabled'
     if (accountBlocked) {
       message = messages[code] ?? error.errorMessage ?? message
     } else if (path === '/authserver/authenticate' && response.status === 403) {

@@ -19,10 +19,23 @@ const busy = ref(false),
   username = ref(''),
   registrationToken = ref('')
 const failure = ref({ message: '', diagnostic: '' })
+const migrationOpen = ref(false)
+const legacyIdentifier = ref('')
+const legacyPassword = ref('')
+async function migrate() {
+  busy.value = true
+  failure.value = { message: '', diagnostic: '' }
+  try {
+    const password = legacyPassword.value
+    legacyPassword.value = ''
+    await auth.migrateLegacy(legacyIdentifier.value.trim(), password)
+  } catch (error) {
+    failure.value = errorInfo(error)
+    busy.value = false
+  }
+}
 const invite = ref('https://discord.com/invite/7VaqSrPukm')
 const errors: Record<string, string> = {
-  DiscordMembershipRequired:
-    'Unite al servidor de Discord de CubicLauncher y volvé a iniciar sesión.',
   DiscordLoginCancelled: 'Cancelaste el inicio de sesión. Podés volver a intentarlo.',
   DiscordStateExpired: 'El intento de ingreso venció. Iniciá sesión de nuevo.',
   AccountBanned: 'Tu cuenta está deshabilitada. Contactá al equipo de CubicLauncher.',
@@ -148,13 +161,31 @@ onMounted(async () => {
             <PhDiscordLogo :size="20" />{{ busy ? 'Conectando…' : 'Continuar con Discord' }}
           </button>
           <p class="auth-footnote">
-            Tenés que ser miembro del servidor de CubicLauncher.
-            <a :href="invite" target="_blank" rel="noopener noreferrer">Unirme al servidor</a>
+            <a :href="invite" target="_blank" rel="noopener noreferrer">Comunidad de Discord</a>
           </p>
           <p class="auth-footnote">
-            Las cuentas anteriores con correo quedaron deshabilitadas. Creá tu cuenta con
-            Discord para continuar.
+            Cambiamos el sistema de cuentas. Si ya tenías una, vinculala a Discord para
+            conservar tu UUID, nombre, skin e historial.
           </p>
+          <template v-if="!registrationToken">
+            <button class="button button-full" :disabled="busy" @click="migrationOpen = !migrationOpen">
+              {{ migrationOpen ? 'Cerrar migración' : 'Vincular mi cuenta anterior' }}
+            </button>
+            <form v-if="migrationOpen" @submit.prevent="migrate">
+              <fieldset :disabled="busy">
+                <label class="field" for="legacy-identifier">Usuario o correo anterior
+                  <input id="legacy-identifier" v-model="legacyIdentifier" autocomplete="username" maxlength="254" required />
+                </label>
+                <label class="field" for="legacy-password">Contraseña anterior
+                  <input id="legacy-password" v-model="legacyPassword" type="password" autocomplete="current-password" required />
+                </label>
+                <p class="auth-footnote">Después de verificarla, autorizá Discord dentro de 10 minutos. Si ese Discord ya tiene una cuenta nueva, se reemplazará por la anterior y se cerrarán sus sesiones.</p>
+                <button class="button button-primary button-full" type="submit">
+                  {{ busy ? 'Verificando…' : 'Verificar y vincular con Discord' }}
+                </button>
+              </fieldset>
+            </form>
+          </template>
           <p v-if="registrationToken" class="auth-footnote">
             Al crear tu cuenta, aceptás los
             <a href="https://dev.cubiclauncher.org/docs/es-ES/Legal/terms">términos de uso.</a>
