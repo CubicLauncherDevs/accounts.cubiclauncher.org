@@ -57,8 +57,7 @@
   z-index: 20;
   height: var(--navbar-height);
   border-bottom: 1px solid var(--cl-border);
-  background: color-mix(in srgb, var(--cl-base) 88%, transparent);
-  backdrop-filter: blur(18px);
+  background: var(--cl-base);
 }
 .header-inner,
 .header-actions,
@@ -172,23 +171,19 @@
   justify-content: center;
   align-items: center;
   gap: 7px;
-  min-height: 42px;
-  padding: 10px 16px;
+  min-height: 36px;
+  padding: 8px 13px;
   border: 1px solid var(--cl-border);
   border-radius: var(--radius);
   background: var(--cl-elevated);
   color: var(--cl-text);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition:
     background-color 0.15s,
     border-color 0.15s,
-    opacity 0.15s,
-    transform 0.18s ease;
-}
-.button:active:not(:disabled) {
-  transform: translateY(1px);
+    opacity 0.15s;
 }
 .button:hover:not(:disabled) {
   background: var(--cl-hover);
@@ -370,7 +365,6 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--cl-surface);
-  box-shadow: 0 24px 70px rgb(0 0 0 / 7%);
   animation: panel-enter 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .auth-frame-inner {
@@ -440,8 +434,7 @@
   color: rgb(255 255 255 / 48%);
 }
 .auth-form-panel {
-  padding: 44px 40px;
-  min-width: 0;
+  padding: 35px 42px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -502,18 +495,14 @@
 }
 
 .account-page {
-  padding-block: 42px 64px;
+  padding-block: 40px 55px;
 }
 .page-heading {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  margin-bottom: 24px;
-  padding: 28px;
-  border: 1px solid var(--cl-border);
-  border-radius: var(--radius-lg);
-  background: var(--cl-surface);
+  margin-bottom: 30px;
 }
 .page-heading h1 {
   font-size: 29px;
@@ -543,35 +532,23 @@
 }
 .account-tabs {
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid var(--cl-border);
-  border-radius: 14px;
-  background: var(--cl-elevated);
-  margin-bottom: 24px;
+  gap: 26px;
+  border-bottom: 1px solid var(--cl-border);
+  margin-bottom: 28px;
 }
 .account-tabs a {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--cl-dim);
-  flex: 1;
-  justify-content: center;
-  font-size: 12px;
-  padding: 12px 16px;
-  border-radius: 9px;
-  transition:
-    background-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease;
+  font-size: 11px;
+  padding: 0 2px 13px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
 .account-tabs a.active {
   color: var(--cl-text);
-  background: var(--cl-surface);
-  box-shadow: 0 2px 5px rgb(0 0 0 / 6%);
-}
-.account-tabs a:hover:not(.active) {
-  background: var(--cl-hover);
+  border-bottom-color: var(--cl-accent);
 }
 .overview-grid {
   display: grid;
@@ -583,33 +560,26 @@
   border: 1px solid var(--cl-border);
   background: var(--cl-surface);
   border-radius: var(--radius-lg);
-  padding: 26px;
+  padding: 23px;
   min-width: 0;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease;
 }
 .panel-heading {
   display: flex;
   gap: 11px;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-start;
+  margin-bottom: 23px;
 }
 .panel-heading > svg {
-  box-sizing: content-box;
-  padding: 10px;
-  background: var(--cl-elevated);
-  border: 1px solid var(--cl-border);
-  border-radius: 12px;
+  margin-top: 2px;
   color: var(--cl-muted);
 }
 .panel-heading h2,
 .panel-heading h3 {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 .panel-heading p {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--cl-dim);
   margin-top: 4px;
 }
@@ -637,7 +607,6 @@
   margin: 0;
   font-size: 12px;
   font-weight: 500;
-  overflow-wrap: anywhere;
 }
 .copy-row,
 .copy-box {
@@ -1377,7 +1346,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
-  gap: 24px;
+  gap: 22px;
 }
 .identity-name {
   display: flex;
@@ -1524,185 +1493,7 @@ button.text-link {
 .verification-field {
   margin-top: 18px;
 }
-
-/* Shared spacing and motion for account, access and appearance panels. */
-.account-content {
-  min-width: 0;
-}
-.account-page > .notice {
-  margin-bottom: 24px;
-}
-.identity-panel,
-.security-panel {
-  display: flex;
-  flex-direction: column;
-}
-.identity-panel .profile-skin-link {
-  margin-top: auto;
-  padding-top: 22px;
-}
-.identity-panel .profile-data {
-  margin-bottom: 24px;
-}
-.launcher-description {
-  color: var(--cl-muted);
-  font-size: 12px;
-  line-height: 1.8;
-}
-.launcher-steps {
-  list-style: none;
-  padding: 0;
-  margin: 24px 0;
-  display: grid;
-  gap: 20px;
-}
-.launcher-steps li {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-.launcher-steps li > span {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--cl-border);
-  border-radius: 10px;
-  background: var(--cl-elevated);
-  font:
-    11px ui-monospace,
-    monospace;
-  color: var(--cl-dim);
-}
-.launcher-steps strong,
-.session-actions strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-.launcher-steps p,
-.session-actions p {
-  font-size: 11px;
-  color: var(--cl-dim);
-  margin-top: 4px;
-  line-height: 1.7;
-}
-.token-privacy {
-  margin: 14px 0 26px;
-  line-height: 1.7;
-}
-.session-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-top: auto;
-  padding-top: 22px;
-  border-top: 1px solid var(--cl-border);
-}
-.session-actions .button {
-  flex-shrink: 0;
-}
-.migration-toggle {
-  margin-top: 18px;
-}
-.migration-form {
-  margin-top: 20px;
-  padding-top: 22px;
-  border-top: 1px solid var(--cl-border);
-}
-.migration-form .auth-footnote {
-  text-align: left;
-  margin: 0 0 20px;
-  font-size: 11px;
-}
-.auth-footnote {
-  font-size: 11px;
-}
-.history-empty {
-  padding: 32px 20px;
-  border-radius: 12px;
-}
-.editor-viewer-panel {
-  display: flex;
-  flex-direction: column;
-}
-.editor-viewer-panel .skin-viewer {
-  flex: 1;
-}
-.page-enter-active,
-.page-leave-active,
-.reveal-enter-active,
-.reveal-leave-active {
-  transition:
-    opacity 180ms ease,
-    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.page-enter-from,
-.reveal-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.page-leave-to,
-.reveal-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-.page-heading {
-  animation: panel-enter 300ms ease both;
-}
-.account-tabs {
-  animation: panel-enter 350ms ease both;
-}
-.settings-grid > .panel,
-.skin-editor-grid > * {
-  animation: panel-enter 350ms ease both;
-}
-.settings-grid > .panel:nth-child(2) {
-  animation-delay: 45ms;
-}
-.settings-grid > .panel:nth-child(3) {
-  animation-delay: 90ms;
-}
-@media (max-width: 850px) {
-  .session-actions {
-    flex-wrap: wrap;
-  }
-  .identity-name {
-    flex-wrap: wrap;
-  }
-  .identity-name .button {
-    margin-left: 0;
-  }
-}
 @media (max-width: 680px) {
-  .page-heading {
-    padding: 20px;
-    gap: 10px;
-  }
-  .page-heading h1 {
-    font-size: 22px;
-    overflow-wrap: anywhere;
-  }
-  .page-heading > div {
-    min-width: 0;
-  }
-  .account-badge {
-    margin-top: 6px;
-  }
-  .account-tabs a {
-    padding: 11px 8px;
-  }
-  .panel-heading {
-    gap: 10px;
-  }
-  .panel-heading h2,
-  .panel-heading h3 {
-    font-size: 14px;
-  }
-  .auth-form-panel {
-    padding: 28px 22px;
-  }
   .settings-grid {
     grid-template-columns: 1fr;
     gap: 18px;
@@ -1724,4 +1515,32 @@ button.text-link {
     flex-direction: column;
     gap: 5px;
   }
+}
+
+/* Full-width content, retaining the original header and component styling. */
+.container.account-page,
+.container.auth-page {
+  max-width: none;
+  padding-inline: clamp(18px, 3vw, 64px);
+}
+.auth-page { margin-block: 0; flex: 1; display: flex; }
+.auth-frame { width: 100%; display: flex; }
+.auth-frame-inner { width: 100%; min-height: 600px; }
+.auth-form-panel { min-width: 0; }
+.auth-form-panel > * { width: 100%; max-width: 480px; margin-inline: auto; }
+.identity-panel, .security-panel { display: flex; flex-direction: column; }
+.identity-panel .profile-data { margin-bottom: 20px; }
+.identity-panel .profile-skin-link { margin-top: auto; }
+.profile-data dd { overflow-wrap: anywhere; }
+.security-panel > p { margin-bottom: 18px; }
+.security-panel > .button-small { align-self: flex-start; margin-top: auto; }
+.security-panel > .button-primary { margin-bottom: 18px; }
+.skin-editor-grid > .editor-viewer-panel { height: 100%; }
+@media (min-width: 1100px) {
+  .auth-frame-inner { min-height: calc(100dvh - 230px); }
+}
+@media (max-width: 680px) {
+  .auth-page { display: block; }
+  .auth-frame-inner { min-height: unset; }
+  .auth-form-panel > * { max-width: none; }
 }

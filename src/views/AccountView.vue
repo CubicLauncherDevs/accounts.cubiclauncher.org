@@ -176,25 +176,10 @@ onBeforeUnmount(() => {
           <p>Generá un token y pegalo como contraseña.</p>
         </div>
       </div>
-      <p class="launcher-description">
-        Entrá con tu nombre de Minecraft o correo de Discord y usá el token como contraseña.
+      <p>
+        Usá tu nombre de Minecraft o correo de Discord y este token en el launcher. Vence en una hora y solo se
+        puede usar una vez. La sesión del juego continúa después de usarlo.
       </p>
-      <ol class="launcher-steps">
-        <li>
-          <span>01</span>
-          <div>
-            <strong>Generá tu acceso</strong>
-            <p>Un token personal, válido durante una hora.</p>
-          </div>
-        </li>
-        <li>
-          <span>02</span>
-          <div>
-            <strong>Copialo en el launcher</strong>
-            <p>Se usa una sola vez. Tu sesión del juego continúa.</p>
-          </div>
-        </li>
-      </ol>
       <button class="button button-primary button-full" :disabled="busy" @click="generate">
         {{
           busy
@@ -204,56 +189,42 @@ onBeforeUnmount(() => {
               : 'Generar token para el launcher'
         }}
       </button>
-      <Transition name="reveal">
-        <div v-if="credential" class="launcher-credential" aria-live="polite">
-          <label>Usuario</label>
-          <div class="copy-row">
-            <code>{{ credential.username }}</code
-            ><CopyButton :value="credential.username" label="Copiar usuario" />
-          </div>
-          <label>Token (contraseña)</label>
-          <button
-            type="button"
-            class="launcher-token-box"
-            :class="{ copied: tokenCopied, revealed: tokenReveal }"
-            :aria-label="tokenCopied ? 'Token copiado' : 'Copiar token'"
-            :title="
-              tokenReveal
-                ? 'Seleccioná el texto para copiarlo'
-                : tokenCopied
-                  ? 'Copiado al portapapeles'
-                  : 'Copiar token'
-            "
-            @click="copyToken"
-          >
-            <code class="launcher-token">{{ credential.token }}</code>
-            <span class="launcher-token-action" aria-live="polite">{{
-              tokenReveal ? 'Copiar a mano' : tokenCopied ? 'Copiado ✓' : 'Copiar'
-            }}</span>
-          </button>
-          <p class="field-hint">
-            Vence a las
-            {{
-              new Date(credential.expiresAt).toLocaleTimeString('es', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            }}. Generar otro invalida el anterior.
-          </p>
+      <div v-if="credential" class="launcher-credential" aria-live="polite">
+        <label>Usuario</label>
+        <div class="copy-row">
+          <code>{{ credential.username }}</code
+          ><CopyButton :value="credential.username" label="Copiar usuario" />
         </div>
-      </Transition>
-      <p class="token-privacy field-hint">
-        El token solo se muestra en esta página y se genera cuando vos lo pedís.
-      </p>
-      <div class="session-actions">
-        <div>
-          <strong>Control de sesiones</strong>
-          <p>Cerrá el acceso en todos tus dispositivos.</p>
-        </div>
-        <button class="button button-small" :disabled="busy" @click="signoutAll">
-          Cerrar sesiones
+        <label>Token (contraseña)</label>
+        <button
+          type="button"
+          class="launcher-token-box"
+          :class="{ copied: tokenCopied, revealed: tokenReveal }"
+          :aria-label="tokenCopied ? 'Token copiado' : 'Copiar token'"
+          :title="tokenReveal ? 'Seleccioná el texto para copiarlo' : tokenCopied ? 'Copiado al portapapeles' : 'Copiar token'"
+          @click="copyToken"
+        >
+          <code class="launcher-token">{{ credential.token }}</code>
+          <span class="launcher-token-action" aria-live="polite">{{
+            tokenReveal ? 'Copiar a mano' : tokenCopied ? 'Copiado ✓' : 'Copiar'
+          }}</span>
         </button>
+        <p class="field-hint">
+          Vence a las
+          {{
+            new Date(credential.expiresAt).toLocaleTimeString('es', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          }}. Generar otro invalida el anterior.
+        </p>
       </div>
+      <p class="field-hint">
+        El token solo se muestra en esta página.
+      </p>
+      <button class="button button-small" :disabled="busy" @click="signoutAll">
+        Cerrar todas las sesiones
+      </button>
     </section>
     <section class="panel history-panel">
       <div class="panel-heading">
@@ -290,7 +261,9 @@ onBeforeUnmount(() => {
           minlength="3"
           maxlength="16"
           required /></label
-      ><button class="button button-primary" :disabled="busy" type="submit">Guardar nombre</button>
+      ><button class="button button-primary" :disabled="busy" type="submit">
+        Guardar nombre
+      </button>
     </form>
   </AnimatedModal>
 </template>

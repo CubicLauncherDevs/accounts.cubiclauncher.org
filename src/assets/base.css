@@ -24,10 +24,10 @@
   --cl-danger: #dc2626;
   --cl-link: #1d4ed8;
   --cl-logo: #09090b;
-  --navbar-height: 68px;
-  --content-width: 1160px;
-  --radius: 10px;
-  --radius-lg: 18px;
+  --navbar-height: 56px;
+  --content-width: 1100px;
+  --radius: 4px;
+  --radius-lg: 8px;
   color-scheme: light;
 }
 

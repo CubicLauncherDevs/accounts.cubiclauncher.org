@@ -32,12 +32,6 @@ watch(
       >
     </nav>
     <NoticeMessage v-if="auth.notice" :message="auth.notice" />
-    <RouterView v-slot="{ Component, route }">
-      <Transition name="page" mode="out-in">
-        <div :key="route.path" class="account-content">
-          <component :is="Component" />
-        </div>
-      </Transition>
-    </RouterView>
+    <RouterView />
   </div>
 </template>
