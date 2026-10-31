@@ -72,7 +72,7 @@ describe('API errors and texture payloads', () => {
     expect(await request('/authserver/validate')).toBeNull()
     expect(fetcher).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ credentials: 'omit' }),
+      expect.objectContaining({ credentials: 'include' }),
     )
   })
   it('decodes saved models and rejects malformed or non-HTTPS textures', () => {

@@ -64,11 +64,17 @@ export async function mockApi(
     challenge: '',
     history: [] as { previousName: string; newName: string; changedAt: string }[],
   }
+  // Credentialed requests cannot use a wildcard origin.
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'content-type, authorization',
     'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
   }
+  const corsFor = (origin: string | undefined) => ({
+    ...cors,
+    'access-control-allow-origin': origin ?? 'http://127.0.0.1:4173',
+    'access-control-allow-credentials': 'true',
+  })
   await page.route('https://discord.com/oauth2/authorize?**', (route) =>
     route.fulfill({
       status: 302,
@@ -78,14 +84,15 @@ export async function mockApi(
   await page.route(`${API}/**`, async (route) => {
     const req = route.request(),
       path = new URL(req.url()).pathname
+    const headers = corsFor(req.headers()['origin'])
     const json = (body: unknown, status = 200) =>
       route.fulfill({
         status,
-        headers: cors,
+        headers,
         contentType: 'application/json',
         body: JSON.stringify(body),
       })
-    const empty = () => route.fulfill({ status: 204, headers: cors })
+    const empty = () => route.fulfill({ status: 204, headers })
     if (req.method() === 'OPTIONS') return empty()
     if (path === '/')
       return json({
@@ -126,6 +133,8 @@ export async function mockApi(
         },
       })
     }
+    // Without a real browser cookie the panel has no session to rehydrate.
+    if (path === '/account/session') return json({ error: 'Unauthorized' }, 401)
     if (path === '/account/session/validate') return empty()
     if (path === '/account/session/logout' || path === '/account/signout-all') {
       state.invalidations++

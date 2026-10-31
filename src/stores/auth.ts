@@ -58,6 +58,17 @@ export const useAuthStore = defineStore('auth', () => {
     persist(null)
   }
 
+  /** The Worker keeps the web session in an HttpOnly cookie, so a new tab can recover it. */
+  async function cookieSession(): Promise<AuthSession | null> {
+    try {
+      const result = await request<AuthSession>('/account/session')
+      return validSession(result) ? result : null
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) return null
+      throw error
+    }
+  }
+
   function restore(retry = false): Promise<void> {
     if (restorePromise && !retry) return restorePromise
     const revision = generation
@@ -72,6 +83,13 @@ export const useAuthStore = defineStore('auth', () => {
       }
       if (!validSession(stored)) {
         persist(null)
+        // A new tab has no sessionStorage but the HttpOnly cookie still holds the session.
+        try {
+          const fromCookie = await cookieSession()
+          if (fromCookie && revision === generation) acceptLogin(fromCookie)
+        } catch (error) {
+          if (revision === generation) restoreError.value = error
+        }
         return
       }
       try {
@@ -92,8 +110,17 @@ export const useAuthStore = defineStore('auth', () => {
           } catch (refreshError) {
             if (revision !== generation) return
             if (refreshError instanceof ApiError && [401, 403].includes(refreshError.status)) {
-              clear()
-              notice.value = 'Tu sesión caducó. Iniciá sesión para continuar.'
+              try {
+                const fromCookie = await cookieSession()
+                if (revision !== generation) return
+                if (fromCookie) acceptLogin(fromCookie)
+                else {
+                  clear()
+                  notice.value = 'Tu sesión caducó. Iniciá sesión para continuar.'
+                }
+              } catch (cookieError) {
+                if (revision === generation) restoreError.value = cookieError
+              }
             } else restoreError.value = refreshError
           }
         } else restoreError.value = error
@@ -276,14 +303,13 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     const token = session.value?.accessToken
     clear()
-    if (token) {
-      try {
-        await post('/account/session/logout', { accessToken: token })
-      } catch {
-        notice.value =
-          'Cerramos la sesión en esta pestaña. El servidor no pudo confirmar la revocación.'
-        return
-      }
+    try {
+      // Without a stored token the Worker revokes the HttpOnly cookie session.
+      await post('/account/session/logout', token ? { accessToken: token } : {})
+    } catch {
+      notice.value =
+        'Cerramos la sesión en esta pestaña. El servidor no pudo confirmar la revocación.'
+      return
     }
     notice.value = 'Sesión cerrada.'
   }

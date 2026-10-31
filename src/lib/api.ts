@@ -72,7 +72,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   try {
     response = await fetch(`${REQUEST_BASE}${path}`, {
       ...options,
-      credentials: 'omit',
+      credentials: 'include',
       signal: options.signal ?? AbortSignal.timeout(20_000),
     })
   } catch {
