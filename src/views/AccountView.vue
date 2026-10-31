@@ -25,6 +25,21 @@ const failure = ref({ message: '', diagnostic: '' }),
   success = ref('')
 const credential = ref<{ token: string; username: string; expiresAt: string } | null>(null)
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
+const tokenCopied = ref(false),
+  tokenReveal = ref(false)
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+async function copyToken() {
+  if (!credential.value) return
+  try {
+    await navigator.clipboard.writeText(credential.value.token)
+    tokenCopied.value = true
+    tokenReveal.value = false
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => (tokenCopied.value = false), 2500)
+  } catch {
+    tokenReveal.value = true
+  }
+}
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(value))
 async function load() {
@@ -42,6 +57,8 @@ async function generate() {
   failure.value = { message: '', diagnostic: '' }
   try {
     credential.value = await auth.generateLauncherToken()
+    tokenCopied.value = false
+    tokenReveal.value = false
     clearTimeout(expiryTimer)
     expiryTimer = setTimeout(
       () => {
@@ -87,7 +104,10 @@ onMounted(async () => {
   await load()
   if (generateAfterLogin && auth.session) await generate()
 })
-onBeforeUnmount(() => clearTimeout(expiryTimer))
+onBeforeUnmount(() => {
+  clearTimeout(expiryTimer)
+  clearTimeout(copyTimer)
+})
 </script>
 
 <template>
@@ -178,10 +198,19 @@ onBeforeUnmount(() => clearTimeout(expiryTimer))
           ><CopyButton :value="credential.username" label="Copiar usuario" />
         </div>
         <label>Token (contraseña)</label>
-        <div class="copy-row">
-          <code class="launcher-token">{{ credential.token }}</code
-          ><CopyButton :value="credential.token" label="Copiar token" />
-        </div>
+        <button
+          type="button"
+          class="launcher-token-box"
+          :class="{ copied: tokenCopied, revealed: tokenReveal }"
+          :aria-label="tokenCopied ? 'Token copiado' : 'Copiar token'"
+          :title="tokenReveal ? 'Seleccioná el texto para copiarlo' : tokenCopied ? 'Copiado al portapapeles' : 'Copiar token'"
+          @click="copyToken"
+        >
+          <code class="launcher-token">{{ credential.token }}</code>
+          <span class="launcher-token-action" aria-live="polite">{{
+            tokenReveal ? 'Copiar a mano' : tokenCopied ? 'Copiado ✓' : 'Copiar'
+          }}</span>
+        </button>
         <p class="field-hint">
           Vence a las
           {{
@@ -253,9 +282,49 @@ onBeforeUnmount(() => clearTimeout(expiryTimer))
   margin-top: 0.75rem;
   font-size: 0.8rem;
 }
-.launcher-token {
+.launcher-token-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px 7px 12px;
+  background: var(--cl-base);
+  border: 1px solid var(--cl-border);
+  border-radius: 4px;
+  color: var(--cl-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.launcher-token-box:hover {
+  background: var(--cl-hover);
+}
+.launcher-token-box .launcher-token {
   overflow-wrap: anywhere;
   white-space: normal;
+  font-size: 11px;
+  filter: blur(5px);
+  user-select: none;
+  transition: filter 0.15s ease;
+}
+.launcher-token-box.revealed .launcher-token {
+  filter: none;
+  user-select: text;
+}
+.launcher-token-action {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cl-muted);
+  border-left: 1px solid var(--cl-border);
+  padding-left: 10px;
+}
+.launcher-token-box:hover .launcher-token-action {
+  color: var(--cl-text);
+}
+.launcher-token-box.copied .launcher-token-action {
+  color: var(--cl-success);
 }
 .security-panel > p {
   margin: 1rem 0;
