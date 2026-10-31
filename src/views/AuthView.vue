@@ -73,8 +73,7 @@ onMounted(async () => {
   if (code || error) history.replaceState(history.state, '', window.location.pathname)
   if (error)
     failure.value = {
-      message:
-        errors[error] ?? 'No pudimos completar el ingreso con Discord. Intentá de nuevo.',
+      message: errors[error] ?? 'No pudimos completar el ingreso con Discord. Intentá de nuevo.',
       diagnostic: '',
     }
   if (code) {
@@ -152,39 +151,65 @@ onMounted(async () => {
               </button>
             </fieldset>
           </form>
-          <button
-            v-else
-            class="button button-primary button-full"
-            :disabled="busy"
-            @click="start"
-          >
+          <button v-else class="button button-primary button-full" :disabled="busy" @click="start">
             <PhDiscordLogo :size="20" />{{ busy ? 'Conectando…' : 'Continuar con Discord' }}
           </button>
           <p class="auth-footnote">
             <a :href="invite" target="_blank" rel="noopener noreferrer">Comunidad de Discord</a>
           </p>
           <p class="auth-footnote">
-            Cambiamos el sistema de cuentas. Si ya tenías una, vinculala a Discord para
-            conservar tu UUID, nombre, skin e historial.
+            Cambiamos el sistema de cuentas. Si ya tenías una, vinculala a Discord para conservar tu
+            UUID, nombre, skin e historial.
           </p>
           <template v-if="!registrationToken">
-            <button class="button button-full" :disabled="busy" @click="migrationOpen = !migrationOpen">
+            <button
+              class="button button-full migration-toggle"
+              :aria-expanded="migrationOpen"
+              aria-controls="migration-form"
+              :disabled="busy"
+              @click="migrationOpen = !migrationOpen"
+            >
               {{ migrationOpen ? 'Cerrar migración' : 'Vincular mi cuenta anterior' }}
             </button>
-            <form v-if="migrationOpen" @submit.prevent="migrate">
-              <fieldset :disabled="busy">
-                <label class="field" for="legacy-identifier">Usuario o correo anterior
-                  <input id="legacy-identifier" v-model="legacyIdentifier" autocomplete="username" maxlength="254" required />
-                </label>
-                <label class="field" for="legacy-password">Contraseña anterior
-                  <input id="legacy-password" v-model="legacyPassword" type="password" autocomplete="current-password" required />
-                </label>
-                <p class="auth-footnote">Después de verificarla, autorizá Discord dentro de 10 minutos. Si ese Discord ya tiene una cuenta nueva, se reemplazará por la anterior y se cerrarán sus sesiones.</p>
-                <button class="button button-primary button-full" type="submit">
-                  {{ busy ? 'Verificando…' : 'Verificar y vincular con Discord' }}
-                </button>
-              </fieldset>
-            </form>
+            <Transition name="reveal">
+              <form
+                v-if="migrationOpen"
+                id="migration-form"
+                class="migration-form"
+                @submit.prevent="migrate"
+              >
+                <fieldset :disabled="busy">
+                  <label class="field" for="legacy-identifier"
+                    >Usuario o correo anterior
+                    <input
+                      id="legacy-identifier"
+                      v-model="legacyIdentifier"
+                      autocomplete="username"
+                      maxlength="254"
+                      required
+                    />
+                  </label>
+                  <label class="field" for="legacy-password"
+                    >Contraseña anterior
+                    <input
+                      id="legacy-password"
+                      v-model="legacyPassword"
+                      type="password"
+                      autocomplete="current-password"
+                      required
+                    />
+                  </label>
+                  <p class="auth-footnote">
+                    Después de verificarla, autorizá Discord dentro de 10 minutos. Si ese Discord ya
+                    tiene una cuenta nueva, se reemplazará por la anterior y se cerrarán sus
+                    sesiones.
+                  </p>
+                  <button class="button button-primary button-full" type="submit">
+                    {{ busy ? 'Verificando…' : 'Verificar y vincular con Discord' }}
+                  </button>
+                </fieldset>
+              </form>
+            </Transition>
           </template>
           <p v-if="registrationToken" class="auth-footnote">
             Al crear tu cuenta, aceptás los
