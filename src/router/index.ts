@@ -4,6 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: '/preview',
+      component: () => import('@/views/PreviewView.vue'),
+      meta: { preview: true, title: 'Vista de demostración' },
+    },
     { path: '/', redirect: '/account' },
     {
       path: '/login',
@@ -46,6 +51,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  if (to.meta.preview) return
   const auth = useAuthStore()
   await auth.restore()
   if (to.hash === '#register' && !auth.session) return '/register'

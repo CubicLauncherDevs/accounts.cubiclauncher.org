@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   PhUserCircle,
@@ -14,7 +14,18 @@ import CopyButton from '@/components/CopyButton.vue'
 import NoticeMessage from '@/components/NoticeMessage.vue'
 import AnimatedModal from '@/components/AnimatedModal.vue'
 
+const props = defineProps<{ preview?: boolean }>()
 const auth = useAuthStore()
+const profile = computed(() => props.preview
+  ? { id: '00000000000000000000000000000000', name: 'CubicPlayer' }
+  : auth.profile)
+const account = computed(() => props.preview ? {
+  discordEmail: 'jugador@example.com',
+  discordId: '000000000000000000',
+  createdAt: '2025-01-01T12:00:00Z',
+  nameHistory: [{ previousName: 'PlayerOne', newName: 'CubicPlayer', changedAt: '2026-01-01T12:00:00Z' }],
+  historyTotal: 1,
+} : auth.account)
 const busy = ref(false),
   loading = ref(false),
   editOpen = ref(false),
@@ -41,6 +52,7 @@ async function copyToken() {
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(new Date(value))
 async function load() {
+  if (props.preview) return
   loading.value = true
   try {
     await auth.loadAccount()
@@ -51,6 +63,7 @@ async function load() {
   }
 }
 async function generate() {
+  if (props.preview) return
   busy.value = true
   failure.value = { message: '', diagnostic: '' }
   try {
@@ -71,10 +84,12 @@ async function generate() {
   }
 }
 function openRename() {
+  if (props.preview) return
   nextName.value = auth.profile?.name ?? ''
   editOpen.value = true
 }
 async function rename() {
+  if (props.preview) return
   busy.value = true
   failure.value = { message: '', diagnostic: '' }
   try {
@@ -91,6 +106,7 @@ async function rename() {
   }
 }
 async function signoutAll() {
+  if (props.preview) return
   busy.value = true
   try {
     await auth.signoutAll()
@@ -124,11 +140,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="identity-name">
-        <span class="profile-initial">{{ auth.profile?.name.slice(0, 1).toUpperCase() }}</span
-        ><strong>{{ auth.profile?.name }}</strong>
+        <span class="profile-initial">{{ profile?.name.slice(0, 1).toUpperCase() }}</span
+        ><strong>{{ profile?.name }}</strong>
         <button
           class="button button-small"
-          :disabled="busy"
+          :disabled="busy || preview"
           @click="openRename"
         >
           Cambiar nombre
@@ -138,24 +154,24 @@ onBeforeUnmount(() => {
         <div>
           <dt>UUID permanente</dt>
           <dd class="copy-row">
-            <code>{{ auth.profile?.id }}</code
-            ><CopyButton :value="auth.profile?.id ?? ''" label="Copiar UUID" />
+            <code>{{ profile?.id }}</code
+            ><CopyButton :value="profile?.id ?? ''" label="Copiar UUID" />
           </dd>
         </div>
         <div>
           <dt>Correo de Discord</dt>
-          <dd>{{ auth.account?.discordEmail ?? (loading ? 'Cargando…' : 'No disponible') }}</dd>
+          <dd>{{ account?.discordEmail ?? (loading ? 'Cargando…' : 'No disponible') }}</dd>
         </div>
         <div>
           <dt>Discord vinculado</dt>
           <dd>
             <PhDiscordLogo :size="16" />
-            {{ auth.account?.discordId ?? (loading ? 'Cargando…' : '—') }}
+            {{ account?.discordId ?? (loading ? 'Cargando…' : '—') }}
           </dd>
         </div>
-        <div v-if="auth.account?.createdAt">
+        <div v-if="account?.createdAt">
           <dt>Cuenta creada</dt>
-          <dd>{{ formatDate(auth.account.createdAt) }}</dd>
+          <dd>{{ formatDate(account.createdAt) }}</dd>
         </div>
       </dl>
       <div class="profile-skin-link">
@@ -163,7 +179,8 @@ onBeforeUnmount(() => {
           <strong>Tu skin, tu estilo.</strong>
           <p>Personalizá tu apariencia en el editor 3D.</p>
         </div>
-        <RouterLink to="/account/skin" class="button"
+        <button v-if="preview" class="button" disabled>Personalizar</button>
+        <RouterLink v-else to="/account/skin" class="button"
           >Personalizar <PhArrowRight :size="14"
         /></RouterLink>
       </div>
@@ -180,7 +197,7 @@ onBeforeUnmount(() => {
         Usá tu nombre de Minecraft o correo de Discord y este token en el launcher. Vence en una hora y solo se
         puede usar una vez. La sesión del juego continúa después de usarlo.
       </p>
-      <button class="button button-primary button-full" :disabled="busy" @click="generate">
+      <button class="button button-primary button-full" :disabled="busy || preview" @click="generate">
         {{
           busy
             ? 'Un momento…'
@@ -222,7 +239,7 @@ onBeforeUnmount(() => {
       <p class="field-hint">
         El token solo se muestra en esta página.
       </p>
-      <button class="button button-small" :disabled="busy" @click="signoutAll">
+      <button class="button button-small" :disabled="busy || preview" @click="signoutAll">
         Cerrar todas las sesiones
       </button>
     </section>
@@ -234,11 +251,11 @@ onBeforeUnmount(() => {
           <p>Tu UUID se conserva cuando cambiás de nombre.</p>
         </div>
       </div>
-      <p v-if="!auth.account?.nameHistory.length" class="history-empty">
+      <p v-if="!account?.nameHistory.length" class="history-empty">
         {{ loading ? 'Cargando historial…' : 'Todavía no hay cambios de nombre.' }}
       </p>
       <ul v-else class="name-history">
-        <li v-for="(item, index) in auth.account.nameHistory" :key="index">
+        <li v-for="(item, index) in account.nameHistory" :key="index">
           <div>
             <span class="previous-name">{{ item.previousName }}</span
             ><PhArrowRight :size="14" /><strong>{{ item.newName }}</strong>
@@ -246,7 +263,7 @@ onBeforeUnmount(() => {
           <time :datetime="item.changedAt">{{ formatDate(item.changedAt) }}</time>
         </li>
       </ul>
-      <p v-if="auth.account && auth.account.historyTotal > 20" class="field-hint">
+      <p v-if="account && account.historyTotal > 20" class="field-hint">
         Mostrando los últimos 20 cambios.
       </p>
     </section>
@@ -261,7 +278,7 @@ onBeforeUnmount(() => {
           minlength="3"
           maxlength="16"
           required /></label
-      ><button class="button button-primary" :disabled="busy" type="submit">
+      ><button class="button button-primary" :disabled="busy || preview" type="submit">
         Guardar nombre
       </button>
     </form>
