@@ -70,6 +70,10 @@ async function generate() {
     busy.value = false
   }
 }
+function openRename() {
+  nextName.value = auth.profile?.name ?? ''
+  editOpen.value = true
+}
 async function rename() {
   busy.value = true
   failure.value = { message: '', diagnostic: '' }
@@ -125,10 +129,7 @@ onBeforeUnmount(() => {
         <button
           class="button button-small"
           :disabled="busy"
-          @click="
-            nextName = auth.profile?.name ?? ''
-            editOpen = true
-          "
+          @click="openRename"
         >
           Cambiar nombre
         </button>
