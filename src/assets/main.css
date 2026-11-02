@@ -493,6 +493,177 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.discord-requirement {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+  padding: 11px 12px;
+  border: 1px solid var(--cl-border);
+  border-radius: var(--radius);
+  background: var(--cl-base);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+.discord-requirement.attention {
+  border-color: color-mix(in srgb, var(--cl-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--cl-danger) 5%, var(--cl-surface));
+}
+.discord-requirement-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--cl-border);
+  border-radius: 6px;
+  background: var(--cl-surface);
+  color: var(--cl-muted);
+}
+.discord-requirement-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.discord-requirement-copy strong {
+  font-size: 10px;
+  font-weight: 600;
+}
+.discord-requirement-copy p {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--cl-dim);
+}
+.discord-requirement .button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: var(--cl-dim);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--cl-border);
+}
+.migration-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--cl-border);
+  border-radius: var(--radius);
+  background: var(--cl-base);
+  color: var(--cl-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
+}
+.migration-toggle:hover,
+.migration-toggle[aria-expanded='true'] {
+  background: var(--cl-elevated);
+  border-color: var(--cl-border-hover);
+}
+.migration-toggle:active {
+  transform: scale(0.995);
+}
+.migration-toggle-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--cl-border);
+  border-radius: 6px;
+  background: var(--cl-surface);
+  color: var(--cl-muted);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.migration-toggle[aria-expanded='true'] .migration-toggle-icon {
+  border-color: var(--cl-border-hover);
+  color: var(--cl-text);
+}
+.migration-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.migration-toggle-copy strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.migration-toggle-copy small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--cl-dim);
+}
+.migration-chevron {
+  margin-left: auto;
+  color: var(--cl-dim);
+  transition:
+    color 0.2s ease,
+    transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.migration-toggle[aria-expanded='true'] .migration-chevron {
+  color: var(--cl-text);
+  transform: rotate(180deg);
+}
+.migration-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.migration-panel > * {
+  min-height: 0;
+  overflow: hidden;
+}
+.migration-form {
+  padding: 4px 2px 0;
+}
+.migration-form .field:first-child {
+  margin-top: 16px;
+}
+.migration-form .notice {
+  margin-bottom: 16px;
+}
+.migration-actions {
+  display: flex;
+  gap: 8px;
+}
+.migration-actions .button-primary {
+  flex: 1;
+}
+.migration-panel-enter-active,
+.migration-panel-leave-active {
+  overflow: hidden;
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.24s ease;
+}
+.migration-panel-enter-from,
+.migration-panel-leave-to {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
 
 .account-page {
   padding-block: 40px 55px;
@@ -1114,6 +1285,19 @@
   }
   .auth-form-panel h1 {
     font-size: 21px;
+  }
+  .discord-requirement {
+    flex-wrap: wrap;
+  }
+  .discord-requirement .button {
+    width: 100%;
+    margin-left: 0;
+  }
+  .migration-actions {
+    flex-direction: column;
+  }
+  .migration-actions .button-primary {
+    width: 100%;
   }
   .account-page {
     padding-block: 28px 35px;

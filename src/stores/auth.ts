@@ -160,16 +160,23 @@ export const useAuthStore = defineStore('auth', () => {
       if (migrationToken) sessionStorage.setItem(MIGRATION_KEY, migrationToken)
       else sessionStorage.removeItem(MIGRATION_KEY)
     } catch {
-      throw new ApiError('Permití el almacenamiento de esta pestaña para entrar con Discord.')
+      throw new ApiError('Habilitá el almacenamiento de esta pestaña para ingresar con Discord.')
     }
-    const result = await post<{ url: string }>('/discord/start', { challenge })
-    const destination = new URL(result.url)
-    if (
-      destination.origin !== 'https://discord.com' ||
-      destination.pathname !== '/oauth2/authorize'
-    )
-      throw new ApiError('El servidor devolvió un enlace de Discord inválido.')
-    window.location.assign(result.url)
+    try {
+      const result = await post<{ url: string }>('/discord/start', { challenge })
+      const destination = new URL(result.url)
+      if (
+        destination.origin !== 'https://discord.com' ||
+        destination.pathname !== '/oauth2/authorize'
+      )
+        throw new ApiError('El servidor devolvió un enlace de Discord inválido.')
+      window.location.assign(result.url)
+    } catch (error) {
+      // Do not leave a stale verifier or migration token if Discord cannot start.
+      sessionStorage.removeItem(VERIFIER_KEY)
+      sessionStorage.removeItem(MIGRATION_KEY)
+      throw error
+    }
   }
 
   async function finishDiscord(code: string) {
@@ -308,7 +315,7 @@ export const useAuthStore = defineStore('auth', () => {
       await post('/account/session/logout', token ? { accessToken: token } : {})
     } catch {
       notice.value =
-        'Cerramos la sesión en esta pestaña. El servidor no pudo confirmar la revocación.'
+        'La sesión se cerró en esta pestaña, pero el servidor no confirmó la revocación.'
       return
     }
     notice.value = 'Sesión cerrada.'

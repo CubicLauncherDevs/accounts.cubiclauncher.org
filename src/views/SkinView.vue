@@ -102,7 +102,7 @@ async function savedFile(): Promise<File> {
     credentials: 'omit',
     signal: AbortSignal.timeout(15_000),
   })
-  if (!response.ok) throw new Error('No pudimos descargar tu skin actual para cambiar el modelo.')
+  if (!response.ok) throw new Error('No se pudo descargar la skin actual para cambiar el modelo.')
   if (Number(response.headers.get('Content-Length')) > MAX_SKIN_BYTES)
     throw new Error('La textura supera el tamaño permitido.')
   return new File([await response.blob()], 'skin.png', { type: 'image/png' })
@@ -124,12 +124,12 @@ async function save() {
     await auth.loadProfile()
     discard()
     needsReload.value = false
-    success.value = 'Skin guardada. Volvé a entrar al mundo o servidor para verla en Minecraft.'
+    success.value = 'Skin guardada. Ingresá de nuevo al mundo o servidor para aplicarla.'
   } catch (error) {
     failure.value = errorInfo(error)
     if (needsReload.value)
       success.value =
-        'La skin se guardó, pero no pudimos actualizar el perfil. Pulsá «Volver a cargar».'
+        'La skin se guardó, pero no se pudo actualizar el perfil. Usá «Volver a cargar».'
   } finally {
     busy.value = false
   }
@@ -142,7 +142,7 @@ async function remove() {
     await auth.deleteSkin()
     discard()
     confirmDelete.value = false
-    success.value = 'Quitamos la skin de tu perfil.'
+    success.value = 'Skin quitada del perfil.'
   } catch (error) {
     failure.value = errorInfo(error)
   } finally {
@@ -161,7 +161,7 @@ onBeforeRouteLeave(
     !auth.session ||
     !dirty.value ||
     needsReload.value ||
-    window.confirm('Tenés cambios sin guardar. ¿Querés salir del editor?'),
+    window.confirm('Hay cambios sin guardar. ¿Salir del editor?'),
 )
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
@@ -177,8 +177,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="section-heading">
     <div>
-      <h2>Hacelo tuyo.</h2>
-      <p class="muted">Probá tu próxima skin antes de llevarla al juego.</p>
+      <h2>Editor de skin</h2>
+      <p class="muted">Subí y previsualizá tu skin antes de guardarla.</p>
     </div>
     <span v-animate-width="180" class="badge resize-badge" :class="{ 'badge-pending': dirty }"
       ><span>{{
@@ -204,7 +204,7 @@ onBeforeUnmount(() => {
           <PhPaintBrush :size="20" />
           <div>
             <h3>Textura de la skin</h3>
-            <p>Una imagen, infinitas personalidades.</p>
+            <p>Archivo PNG y modelo del personaje.</p>
           </div>
         </div>
         <fieldset :disabled="busy || loading || needsReload || !auth.profileLoaded">
@@ -272,14 +272,14 @@ onBeforeUnmount(() => {
       <div class="subtle-note">
         <PhInfo :size="18" />
         <p>
-          La vista previa es local hasta que guardás. Cambiar la animación o la segunda capa solo
-          afecta al visor.
+          La vista previa es local hasta guardar. La animación y la segunda capa solo afectan al
+          visor.
         </p>
       </div>
       <section v-if="auth.skin" class="panel remove-panel">
         <div>
-          <h3>Volver a la apariencia predeterminada</h3>
-          <p class="muted">Quitá la skin personalizada de tu perfil.</p>
+          <h3>Restablecer apariencia</h3>
+          <p class="muted">Se quitará la skin personalizada del perfil.</p>
         </div>
         <button
           class="button button-danger"
@@ -299,9 +299,9 @@ onBeforeUnmount(() => {
       </div>
     </section>
   </div>
-  <AnimatedModal v-model:open="confirmDelete" title="Quitar tu skin" :busy="busy">
+  <AnimatedModal v-model:open="confirmDelete" title="Quitar skin" :busy="busy">
     <p>
-      Tu perfil volverá a usar la apariencia predeterminada. Podés subir otra skin cuando quieras.
+      El perfil volverá a la apariencia predeterminada. Podés subir otra skin cuando quieras.
     </p>
     <NoticeMessage v-if="failure.message" kind="error" v-bind="failure" />
     <template #footer
@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
         Cancelar</button
       ><button class="button button-danger" :disabled="busy" @click="remove">
         <span v-if="busy" class="spinner" /><PhTrash v-else :size="15" />{{
-          busy ? 'Quitando…' : 'Sí, quitar skin'
+          busy ? 'Quitando…' : 'Confirmar'
         }}
       </button></template
     >

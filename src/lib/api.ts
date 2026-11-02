@@ -50,20 +50,21 @@ export class ApiError extends Error {
 
 const messages: Record<string, string> = {
   MigrationCredentialsInvalid: 'El usuario o la contraseña anterior no son correctos.',
-  MigrationExpired: 'La verificación venció. Volvé a verificar tu cuenta anterior.',
-  MigrationUnavailable: 'No pudimos consultar las cuentas anteriores. Intentá de nuevo.',
-  MigrationProfileMissing: 'No encontramos el perfil de tu cuenta anterior.',
+  MigrationExpired: 'La verificación venció. Repetí la verificación de la cuenta anterior.',
+  MigrationUnavailable: 'No se pudieron consultar las cuentas anteriores. Reintentá.',
+  MigrationProfileMissing: 'No se encontró el perfil de la cuenta anterior.',
   LegacyAlreadyLinked: 'Esta cuenta anterior ya está vinculada a otro Discord.',
-  DiscordLoginFailed: 'No se pudo autorizar el acceso con Discord. Volvé a intentarlo.',
+  DiscordLoginFailed: 'No se pudo autorizar el acceso con Discord. Reintentá.',
   DiscordLoginCancelled: 'Cancelaste el inicio de sesión con Discord.',
   DiscordStateExpired: 'Este intento de ingreso venció. Volvé a iniciar sesión con Discord.',
-  DiscordUnavailable: 'Discord no está disponible en este momento. Volvé a intentarlo.',
+  DiscordUnavailable: 'Discord no está disponible. Reintentá más tarde.',
+  DiscordMembershipRequired: 'Tenés que estar en el servidor de Discord para ingresar.',
   RegistrationDisabled: 'Los registros están cerrados por el momento.',
   AccountBanned:
     'Tu cuenta está suspendida. Contactá al equipo de CubicLauncher si necesitás ayuda.',
-  TooManyRequests: 'Demasiados intentos. Esperá unos minutos antes de volver a probar.',
+  TooManyRequests: 'Demasiados intentos. Esperá unos minutos antes de reintentar.',
   ConfigurationError: 'El servicio todavía necesita configuración. Contactá al administrador.',
-  DatabaseFunctionMissing: 'La base de datos del servicio todavía no está lista.',
+  DatabaseFunctionMissing: 'El servicio de base de datos no está disponible.',
   UsernameTaken: 'Ese nombre de Minecraft ya está en uso.',
 }
 
@@ -120,7 +121,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     ) {
       message = 'Tu sesión ya no es válida. Volvé a iniciar sesión.'
     } else if (response.status >= 500 && !messages[code]) {
-      message = 'El servicio no está disponible en este momento. Intentá de nuevo más tarde.'
+      message = 'El servicio no está disponible. Reintentá más tarde.'
     }
     const details = error.details
     const diagnostic = [

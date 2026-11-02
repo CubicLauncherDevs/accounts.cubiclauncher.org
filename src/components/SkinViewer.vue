@@ -73,7 +73,7 @@ async function loadTexture() {
     active.value = true
   } catch {
     if (alive && current === loadId) {
-      failure.value = 'No pudimos cargar esta textura en 3D. Podés seguir usando el editor.'
+      failure.value = 'No se pudo cargar la textura en 3D. El editor sigue disponible.'
       active.value = false
     }
   } finally {
@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
     :data-viewer-state="loading ? 'loading' : active ? 'ready' : 'fallback'"
   >
     <div class="viewer-label">
-      <span><PhCube :size="13" /> {{ src ? 'VISTA PREVIA' : 'MODELO DE REFERENCIA' }}</span
+      <span><PhCube :size="13" /> {{ src ? 'VISTA PREVIA' : 'MODELO BASE' }}</span
       ><span>{{ model === 'slim' ? 'SLIM' : 'CLÁSICO' }}</span>
     </div>
     <div ref="container" class="viewer-stage">
@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
         aria-label="Vista 3D del personaje. Usá los controles para girar y acercar."
       />
       <div v-if="loading" class="viewer-overlay" role="status">
-        <span class="spinner" /> Preparando tu personaje…
+        <span class="spinner" /> Cargando modelo…
       </div>
       <div v-else-if="failure" class="viewer-fallback">
         <img :src="src ?? fallback" alt="Textura de la skin en 2D" />

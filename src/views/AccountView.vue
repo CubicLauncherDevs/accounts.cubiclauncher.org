@@ -82,7 +82,7 @@ async function rename() {
     credential.value = null
     editOpen.value = false
     success.value =
-      'Nombre actualizado. Conservás tu UUID; volvé a entrar en el launcher para actualizar el nombre.'
+      'Nombre actualizado. El UUID no cambia. Volvé a iniciar sesión en el launcher para actualizarlo.'
     await load()
   } catch (error) {
     failure.value = errorInfo(error)
@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
         <PhUserCircle :size="22" />
         <div>
           <h2>Tu perfil</h2>
-          <p>Tu identidad de Minecraft.</p>
+          <p>Identidad de Minecraft.</p>
         </div>
       </div>
       <div class="identity-name">
@@ -160,8 +160,8 @@ onBeforeUnmount(() => {
       </dl>
       <div class="profile-skin-link">
         <div>
-          <strong>Tu skin, tu estilo.</strong>
-          <p>Personalizá tu apariencia en el editor 3D.</p>
+          <strong>Skin</strong>
+          <p>Editá tu skin y previsualizala en 3D.</p>
         </div>
         <RouterLink to="/account/skin" class="button"
           >Personalizar <PhArrowRight :size="14"
@@ -177,13 +177,13 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <p>
-        Usá tu nombre de Minecraft o correo de Discord y este token en el launcher. Vence en una hora y solo se
-        puede usar una vez. La sesión del juego continúa después de usarlo.
+        Usá tu nombre de Minecraft o correo de Discord y el token como contraseña. Vence en una
+        hora, admite un solo uso y no cierra la sesión del juego.
       </p>
       <button class="button button-primary button-full" :disabled="busy" @click="generate">
         {{
           busy
-            ? 'Un momento…'
+            ? 'Generando…'
             : credential
               ? 'Generar otro token'
               : 'Generar token para el launcher'
@@ -231,7 +231,7 @@ onBeforeUnmount(() => {
         <PhClockCounterClockwise :size="22" />
         <div>
           <h2>Historial de nombres</h2>
-          <p>Tu UUID se conserva cuando cambiás de nombre.</p>
+          <p>El UUID se mantiene al cambiar de nombre.</p>
         </div>
       </div>
       <p v-if="!auth.account?.nameHistory.length" class="history-empty">

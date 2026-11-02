@@ -18,9 +18,9 @@ watch(
   <div class="container account-page">
     <div class="page-heading">
       <div>
-        <span class="eyebrow">TU CUENTA CUBIC</span>
+        <span class="eyebrow">CUENTA CUBICLAUNCHER</span>
         <h1>Hola, {{ auth.profile?.name }}<span class="heading-dot">.</span></h1>
-        <p class="muted">Tu perfil, tu apariencia y el próximo mundo por explorar.</p>
+        <p class="muted">Perfil, skin y acceso al launcher.</p>
       </div>
       <span class="account-badge"><span class="status-dot" /> Sesión activa</span>
     </div>

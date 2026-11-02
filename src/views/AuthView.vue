@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   PhDiscordLogo,
@@ -7,6 +7,8 @@ import {
   PhShieldCheck,
   PhPaintBrush,
   PhFingerprint,
+  PhLinkSimple,
+  PhCaretDown,
 } from '@phosphor-icons/vue'
 import CubicLogo from '@/components/CubicLogo.vue'
 import NoticeMessage from '@/components/NoticeMessage.vue'
@@ -19,46 +21,68 @@ const busy = ref(false),
   username = ref(''),
   registrationToken = ref('')
 const failure = ref({ message: '', diagnostic: '' })
+const membershipRequired = ref(false)
 const migrationOpen = ref(false)
+const migrationFailure = ref({ message: '', diagnostic: '' })
 const legacyIdentifier = ref('')
 const legacyPassword = ref('')
+const legacyIdentifierField = ref<HTMLInputElement | null>(null)
+async function toggleMigration() {
+  migrationOpen.value = !migrationOpen.value
+  migrationFailure.value = { message: '', diagnostic: '' }
+  if (migrationOpen.value) {
+    await nextTick()
+    legacyIdentifierField.value?.focus()
+  }
+}
+function closeMigration() {
+  migrationOpen.value = false
+  migrationFailure.value = { message: '', diagnostic: '' }
+}
 async function migrate() {
   busy.value = true
-  failure.value = { message: '', diagnostic: '' }
+  migrationFailure.value = { message: '', diagnostic: '' }
   try {
     const password = legacyPassword.value
     legacyPassword.value = ''
     await auth.migrateLegacy(legacyIdentifier.value.trim(), password)
   } catch (error) {
-    failure.value = errorInfo(error)
+    migrationFailure.value = errorInfo(error)
+  } finally {
     busy.value = false
   }
 }
 const invite = ref('https://discord.com/invite/7VaqSrPukm')
 const errors: Record<string, string> = {
-  DiscordLoginCancelled: 'Cancelaste el inicio de sesión. Podés volver a intentarlo.',
+  DiscordLoginCancelled: 'Cancelaste el inicio de sesión con Discord. Podés reintentarlo.',
   DiscordStateExpired: 'El intento de ingreso venció. Iniciá sesión de nuevo.',
   AccountBanned: 'Tu cuenta está deshabilitada. Contactá al equipo de CubicLauncher.',
+}
+function setFailure(error: unknown) {
+  failure.value = errorInfo(error)
+  membershipRequired.value = error instanceof ApiError && error.code === 'DiscordMembershipRequired'
 }
 async function start() {
   busy.value = true
   failure.value = { message: '', diagnostic: '' }
+  membershipRequired.value = false
   try {
     await auth.startDiscord()
   } catch (error) {
-    failure.value = errorInfo(error)
+    setFailure(error)
     busy.value = false
   }
 }
 async function register() {
   busy.value = true
   failure.value = { message: '', diagnostic: '' }
+  membershipRequired.value = false
   try {
     await auth.registerDiscord(username.value.trim(), registrationToken.value)
     registrationToken.value = ''
     await router.replace('/account')
   } catch (error) {
-    failure.value = errorInfo(error)
+    setFailure(error)
     if (error instanceof ApiError && error.code === 'DiscordStateExpired')
       registrationToken.value = ''
   } finally {
@@ -73,8 +97,7 @@ onMounted(async () => {
   if (code || error) history.replaceState(history.state, '', window.location.pathname)
   if (error)
     failure.value = {
-      message:
-        errors[error] ?? 'No pudimos completar el ingreso con Discord. Intentá de nuevo.',
+      message: errors[error] ?? 'No se pudo completar el inicio de sesión con Discord. Reintentá.',
       diagnostic: '',
     }
   if (code) {
@@ -83,7 +106,7 @@ onMounted(async () => {
       registrationToken.value = (await auth.finishDiscord(code)) ?? ''
       if (auth.session) await router.replace('/account')
     } catch (error) {
-      failure.value = errorInfo(error)
+      setFailure(error)
     } finally {
       busy.value = false
     }
@@ -109,28 +132,38 @@ onMounted(async () => {
           <div class="showcase-content">
             <span class="eyebrow light-eyebrow">CUBICLAUNCHER ACCOUNTS</span>
             <CubicLogo class="showcase-logo" />
-            <h2>Tu perfil de Minecraft,<br />a tu manera.</h2>
-            <p>Entrá con Discord, elegí tu nombre y preparate para jugar.</p>
+            <h2>Cuenta de Minecraft<br />y acceso al launcher.</h2>
+            <p>Perfil, skin y acceso al launcher en una sola cuenta.</p>
             <div class="showcase-features">
-              <span><PhFingerprint :size="18" /> Tu nombre y su historial</span>
-              <span><PhPaintBrush :size="18" /> Skins con vista previa en 3D</span>
-              <span><PhShieldCheck :size="18" /> Acceso con tu cuenta de Discord</span>
+              <span><PhFingerprint :size="18" /> UUID y nombre persistentes</span>
+              <span><PhPaintBrush :size="18" /> Editor de skin con vista 3D</span>
+              <span><PhShieldCheck :size="18" /> Token de acceso al launcher</span>
             </div>
           </div>
           <span class="showcase-caption">CubicLauncher · Gestión de cuentas</span>
         </section>
         <section class="auth-form-panel">
-          <span class="eyebrow">TU ESPACIO EN CUBIC</span>
+          <span class="eyebrow">CUENTA CUBICLAUNCHER</span>
           <h1>{{ registrationToken ? 'Elegí tu nombre' : 'Iniciar sesión con Discord' }}</h1>
           <p class="muted auth-description">
             {{
               registrationToken
-                ? 'Este será tu nombre en Minecraft. Tu cuenta queda vinculada a Discord.'
-                : 'Entrá o creá tu cuenta. Después podrás generar el token que vas a usar como contraseña en el launcher.'
+                ? 'Este nombre se usará en Minecraft y quedará vinculado a tu cuenta de Discord.'
+                : 'Ingresá con Discord para administrar tu cuenta y generar el token del launcher.'
             }}
           </p>
           <NoticeMessage v-if="auth.notice" :message="auth.notice" />
           <NoticeMessage kind="error" v-bind="failure" />
+          <div class="discord-requirement" :class="{ attention: membershipRequired }">
+            <span class="discord-requirement-icon"><PhDiscordLogo :size="17" /></span>
+            <div class="discord-requirement-copy">
+              <strong>Requisito de acceso</strong>
+              <p>Es necesario estar en el servidor de CubicLauncher para ingresar.</p>
+            </div>
+            <a class="button button-small" :href="invite" target="_blank" rel="noopener noreferrer"
+              >Unirme al servidor</a
+            >
+          </div>
           <form v-if="registrationToken" @submit.prevent="register">
             <fieldset :disabled="busy">
               <label class="field" for="username"
@@ -152,39 +185,78 @@ onMounted(async () => {
               </button>
             </fieldset>
           </form>
-          <button
-            v-else
-            class="button button-primary button-full"
-            :disabled="busy"
-            @click="start"
-          >
+          <button v-else class="button button-primary button-full" :disabled="busy" @click="start">
             <PhDiscordLogo :size="20" />{{ busy ? 'Conectando…' : 'Continuar con Discord' }}
           </button>
-          <p class="auth-footnote">
-            <a :href="invite" target="_blank" rel="noopener noreferrer">Comunidad de Discord</a>
-          </p>
-          <p class="auth-footnote">
-            Cambiamos el sistema de cuentas. Si ya tenías una, vinculala a Discord para
-            conservar tu UUID, nombre, skin e historial.
-          </p>
           <template v-if="!registrationToken">
-            <button class="button button-full" :disabled="busy" @click="migrationOpen = !migrationOpen">
-              {{ migrationOpen ? 'Cerrar migración' : 'Vincular mi cuenta anterior' }}
-            </button>
-            <form v-if="migrationOpen" @submit.prevent="migrate">
-              <fieldset :disabled="busy">
-                <label class="field" for="legacy-identifier">Usuario o correo anterior
-                  <input id="legacy-identifier" v-model="legacyIdentifier" autocomplete="username" maxlength="254" required />
-                </label>
-                <label class="field" for="legacy-password">Contraseña anterior
-                  <input id="legacy-password" v-model="legacyPassword" type="password" autocomplete="current-password" required />
-                </label>
-                <p class="auth-footnote">Después de verificarla, autorizá Discord dentro de 10 minutos. Si ese Discord ya tiene una cuenta nueva, se reemplazará por la anterior y se cerrarán sus sesiones.</p>
-                <button class="button button-primary button-full" type="submit">
-                  {{ busy ? 'Verificando…' : 'Verificar y vincular con Discord' }}
-                </button>
-              </fieldset>
-            </form>
+            <div class="auth-divider" aria-hidden="true"><span>o</span></div>
+            <section class="migration">
+              <button
+                type="button"
+                class="migration-toggle"
+                :aria-expanded="migrationOpen"
+                aria-controls="migration-panel"
+                @click="toggleMigration"
+              >
+                <span class="migration-toggle-icon"><PhLinkSimple :size="17" /></span>
+                <span class="migration-toggle-copy">
+                  <strong>Migrar cuenta anterior</strong>
+                  <small>Vinculá tu perfil del sistema anterior a Discord.</small>
+                </span>
+                <PhCaretDown class="migration-chevron" :size="16" aria-hidden="true" />
+              </button>
+              <Transition name="migration-panel">
+                <div v-if="migrationOpen" id="migration-panel" class="migration-panel">
+                  <form class="migration-form" @submit.prevent="migrate">
+                    <fieldset :disabled="busy">
+                      <label class="field" for="legacy-identifier"
+                        >Usuario o correo anterior
+                        <input
+                          id="legacy-identifier"
+                          ref="legacyIdentifierField"
+                          v-model="legacyIdentifier"
+                          autocomplete="username"
+                          autocapitalize="none"
+                          spellcheck="false"
+                          maxlength="254"
+                          required
+                        />
+                      </label>
+                      <label class="field" for="legacy-password"
+                        >Contraseña anterior
+                        <input
+                          id="legacy-password"
+                          v-model="legacyPassword"
+                          type="password"
+                          autocomplete="current-password"
+                          required
+                        />
+                      </label>
+                      <NoticeMessage
+                        kind="info"
+                        message="La verificación vence a los 10 minutos. Si el Discord ya tiene una cuenta, se reemplaza por la anterior y se cierran sus sesiones."
+                      />
+                      <NoticeMessage kind="error" v-bind="migrationFailure" />
+                      <div class="migration-actions">
+                        <button class="button button-primary" type="submit">
+                          <PhDiscordLogo :size="18" />{{
+                            busy ? 'Verificando…' : 'Verificar y vincular'
+                          }}
+                        </button>
+                        <button
+                          class="button"
+                          type="button"
+                          :disabled="busy"
+                          @click="closeMigration"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </fieldset>
+                  </form>
+                </div>
+              </Transition>
+            </section>
           </template>
           <p v-if="registrationToken" class="auth-footnote">
             Al crear tu cuenta, aceptás los

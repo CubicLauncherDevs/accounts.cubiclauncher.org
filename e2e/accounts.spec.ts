@@ -30,11 +30,46 @@ test('registers a new Discord identity by choosing a player name', async ({ page
   expect(api.registrations).toBe(1)
 })
 
+test('expands the legacy migration form and carries its token through Discord', async ({
+  page,
+}) => {
+  const api = await mockApi(page)
+  await page.goto('/login')
+  const toggle = page.getByRole('button', { name: 'Migrar cuenta anterior' })
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByLabel('Usuario o correo anterior')).toBeFocused()
+  await page.getByLabel('Usuario o correo anterior').fill('OldPlayer')
+  await page.getByLabel('Contraseña anterior').fill('secret')
+  await page.getByRole('button', { name: 'Verificar y vincular' }).click()
+  await expect(page.getByRole('heading', { name: 'Hola, TestPlayer.' })).toBeVisible()
+  expect(api.migrations).toBe(1)
+  expect(api.migrationToken).toBe('e'.repeat(64))
+})
+
+test('shows legacy migration errors inside the expanded section', async ({ page }) => {
+  const api = await mockApi(page, { migrationError: true })
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Migrar cuenta anterior' }).click()
+  await page.getByLabel('Usuario o correo anterior').fill('OldPlayer')
+  await page.getByLabel('Contraseña anterior').fill('wrong')
+  await page.getByRole('button', { name: 'Verificar y vincular' }).click()
+  await expect(page.locator('.migration').getByRole('alert')).toContainText(
+    'El usuario o la contraseña anterior no son correctos.',
+  )
+  await expect(page.getByLabel('Contraseña anterior')).toHaveValue('')
+  expect(api.migrations).toBe(1)
+})
+
 test('explains the server membership requirement without creating a session', async ({
   page,
 }) => {
   await mockApi(page, { loginError: 'membership' })
   await page.goto('/login')
+  await expect(
+    page.getByText('Es necesario estar en el servidor de CubicLauncher para ingresar.'),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Continuar con Discord' }).click()
   await expect(page.getByRole('alert')).toContainText('Tenés que estar en el servidor')
   await expect(page.getByRole('link', { name: 'Unirme al servidor' })).toHaveAttribute(
@@ -162,7 +197,7 @@ test('animates the confirmation dialog, restores focus and deletes only after co
   await page.getByRole('link', { name: 'Apariencia', exact: true }).click()
   const trigger = page.getByRole('button', { name: 'Quitar skin', exact: true })
   await trigger.click()
-  const modal = page.getByRole('dialog', { name: 'Quitar tu skin' })
+  const modal = page.getByRole('dialog', { name: 'Quitar skin' })
   await expect(modal).toBeVisible()
   await expect(modal.getByRole('button', { name: 'Cancelar' })).toBeFocused()
   await page.keyboard.press('Escape')
@@ -171,9 +206,9 @@ test('animates the confirmation dialog, restores focus and deletes only after co
   expect(api.deletes).toBe(0)
   await trigger.click()
   await page.screenshot({ path: info.outputPath('animated-modal.png'), animations: 'disabled' })
-  await modal.getByRole('button', { name: 'Sí, quitar skin', exact: true }).click()
+  await modal.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await expect(modal).toBeHidden()
-  await expect(page.getByRole('status').filter({ hasText: 'Quitamos la skin' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Skin quitada' })).toBeVisible()
   expect(api.deletes).toBe(1)
 })
 

@@ -50,7 +50,11 @@ export function png(height = 64) {
 
 export async function mockApi(
   page: Page,
-  options: { loginError?: 'banned' | 'membership'; newAccount?: boolean } = {},
+  options: {
+    loginError?: 'banned' | 'membership'
+    newAccount?: boolean
+    migrationError?: boolean
+  } = {},
 ) {
   const state = {
     hasSkin: true,
@@ -60,6 +64,8 @@ export async function mockApi(
     registrations: 0,
     invalidations: 0,
     tokens: 0,
+    migrations: 0,
+    migrationToken: '',
     name: 'TestPlayer',
     challenge: '',
     history: [] as { previousName: string; newName: string; changedAt: string }[],
@@ -99,6 +105,12 @@ export async function mockApi(
         meta: { registrationEnabled: true },
         discordInviteUrl: 'https://discord.com/invite/7VaqSrPukm',
       })
+    if (path === '/migration/verify') {
+      state.migrations++
+      if (options.migrationError)
+        return json({ error: 'MigrationCredentialsInvalid' }, 400)
+      return json({ token: 'e'.repeat(64) })
+    }
     if (path === '/discord/start') {
       state.challenge = req.postDataJSON().challenge
       return json({
@@ -106,10 +118,9 @@ export async function mockApi(
       })
     }
     if (path === '/discord/exchange') {
-      if (
-        createHash('sha256').update(req.postDataJSON().verifier).digest('hex') !==
-        state.challenge
-      )
+      const body = req.postDataJSON()
+      state.migrationToken = body.migrationToken ?? ''
+      if (createHash('sha256').update(body.verifier).digest('hex') !== state.challenge)
         return json({ error: 'DiscordStateExpired' }, 403)
       if (options.loginError)
         return json(
