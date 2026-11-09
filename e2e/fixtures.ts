@@ -63,6 +63,7 @@ export async function mockApi(
     deletes: 0,
     registrations: 0,
     invalidations: 0,
+    accountDeletes: 0,
     tokens: 0,
     migrations: 0,
     migrationToken: '',
@@ -149,6 +150,15 @@ export async function mockApi(
     if (path === '/account/session/validate') return empty()
     if (path === '/account/session/logout' || path === '/account/signout-all') {
       state.invalidations++
+      return empty()
+    }
+    if (path === '/account' && req.method() === 'DELETE') {
+      if (req.postDataJSON().confirmation !== state.name)
+        return json(
+          { error: 'IllegalArgumentException', errorMessage: 'Invalid confirmation.' },
+          400,
+        )
+      state.accountDeletes++
       return empty()
     }
     if (path === '/account/launcher-token') {

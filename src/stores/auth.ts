@@ -262,7 +262,11 @@ export const useAuthStore = defineStore('auth', () => {
     persist(value)
   }
 
-  async function accountRequest<T>(path: string, body?: unknown): Promise<T> {
+  async function accountRequest<T>(
+    path: string,
+    body?: unknown,
+    method: 'GET' | 'POST' | 'DELETE' = body === undefined ? 'GET' : 'POST',
+  ): Promise<T> {
     if (!session.value)
       throw new ApiError('Iniciá sesión para continuar.', 401, 'SessionExpired')
     const headers: Record<string, string> = {
@@ -271,7 +275,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     try {
       return await request<T>(path, {
-        method: body === undefined ? 'GET' : 'POST',
+        method,
         headers,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
@@ -305,6 +309,20 @@ export const useAuthStore = defineStore('auth', () => {
   async function signoutAll() {
     await accountRequest('/account/signout-all', {})
     clear()
+  }
+  /** Irreversible removal. The exact Minecraft name is required as confirmation. */
+  async function deleteAccount(confirmation: string) {
+    const name = session.value?.selectedProfile.name
+    if (!name) throw new ApiError('Iniciá sesión para continuar.', 401, 'SessionExpired')
+    if (confirmation !== name)
+      throw new ApiError(
+        'Escribí tu nombre de Minecraft exacto para confirmar.',
+        400,
+        'IllegalArgumentException',
+      )
+    await accountRequest('/account', { confirmation }, 'DELETE')
+    clear()
+    notice.value = 'Tu cuenta y todos sus datos se eliminaron.'
   }
 
   async function logout() {
@@ -342,5 +360,6 @@ export const useAuthStore = defineStore('auth', () => {
     changeUsername,
     generateLauncherToken,
     signoutAll,
+    deleteAccount,
   }
 })

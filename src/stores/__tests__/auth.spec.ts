@@ -97,6 +97,26 @@ describe('Discord session lifecycle', () => {
     )
     expect(JSON.stringify(sessionStorage)).not.toContain('e'.repeat(64))
   })
+  it('deletes the account only with the exact name and clears the session', async () => {
+    sessionStorage.setItem(key, JSON.stringify(session))
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetcher)
+    const store = useAuthStore()
+    await store.restore()
+    await expect(store.deleteAccount('testplayer')).rejects.toMatchObject({ status: 400 })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    await store.deleteAccount('TestPlayer')
+    expect(fetcher.mock.calls[1]?.[0]).toContain('/account')
+    expect(fetcher.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' })
+    expect(JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body))).toEqual({
+      confirmation: 'TestPlayer',
+    })
+    expect(store.session).toBeNull()
+    expect(sessionStorage.getItem(key)).toBeNull()
+  })
   it('clears expired sessions but preserves the saved candidate on a temporary outage', async () => {
     sessionStorage.setItem(key, JSON.stringify(session))
     vi.stubGlobal(

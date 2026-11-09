@@ -7,6 +7,8 @@ import {
   PhClockCounterClockwise,
   PhArrowRight,
   PhKey,
+  PhTrash,
+  PhWarning,
 } from '@phosphor-icons/vue'
 import { errorInfo } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +20,8 @@ const auth = useAuthStore()
 const busy = ref(false),
   loading = ref(false),
   editOpen = ref(false),
+  deleteOpen = ref(false),
+  confirmation = ref(''),
   nextName = ref('')
 const failure = ref({ message: '', diagnostic: '' }),
   success = ref('')
@@ -94,6 +98,23 @@ async function signoutAll() {
   busy.value = true
   try {
     await auth.signoutAll()
+  } catch (error) {
+    failure.value = errorInfo(error)
+  } finally {
+    busy.value = false
+  }
+}
+function openDelete() {
+  confirmation.value = ''
+  failure.value = { message: '', diagnostic: '' }
+  deleteOpen.value = true
+}
+async function removeAccount() {
+  busy.value = true
+  failure.value = { message: '', diagnostic: '' }
+  try {
+    await auth.deleteAccount(confirmation.value)
+    deleteOpen.value = false
   } catch (error) {
     failure.value = errorInfo(error)
   } finally {
@@ -250,6 +271,22 @@ onBeforeUnmount(() => {
         Mostrando los últimos 20 cambios.
       </p>
     </section>
+    <section class="panel danger-panel">
+      <div class="panel-heading">
+        <PhWarning :size="22" />
+        <div>
+          <h2>Eliminar cuenta</h2>
+          <p>Esta acción es permanente e irreversible.</p>
+        </div>
+      </div>
+      <p>
+        Se borrarán tu perfil, tu historial de nombres, tus sesiones y los tokens del launcher. No
+        se puede deshacer.
+      </p>
+      <button class="button button-danger" :disabled="busy" @click="openDelete">
+        <PhTrash :size="15" /> Eliminar cuenta
+      </button>
+    </section>
   </div>
   <AnimatedModal v-model:open="editOpen" title="Cambiar nombre de Minecraft" :busy="busy">
     <form @submit.prevent="rename">
@@ -265,6 +302,36 @@ onBeforeUnmount(() => {
         Guardar nombre
       </button>
     </form>
+  </AnimatedModal>
+  <AnimatedModal v-model:open="deleteOpen" title="Eliminar cuenta" :busy="busy">
+    <p>
+      Se borrarán el perfil <strong>{{ auth.profile?.name }}</strong
+      >, el historial de nombres, las sesiones y los tokens del launcher. Esta acción no se puede
+      deshacer.
+    </p>
+    <label class="field" for="delete-confirmation"
+      ><span>Escribí <strong>{{ auth.profile?.name }}</strong> para confirmar</span
+      ><input
+        id="delete-confirmation"
+        v-model="confirmation"
+        autocomplete="off"
+        spellcheck="false"
+        required
+    /></label>
+    <NoticeMessage v-if="failure.message" kind="error" v-bind="failure" />
+    <template #footer
+      ><button class="button" :disabled="busy" autofocus @click="deleteOpen = false">
+        Cancelar</button
+      ><button
+        class="button button-danger"
+        :disabled="busy || confirmation !== auth.profile?.name"
+        @click="removeAccount"
+      >
+        <span v-if="busy" class="spinner" /><PhTrash v-else :size="15" />{{
+          busy ? 'Eliminando…' : 'Eliminar cuenta'
+        }}
+      </button></template
+    >
   </AnimatedModal>
 </template>
 
@@ -329,5 +396,13 @@ onBeforeUnmount(() => {
 }
 .security-panel > .button {
   margin-top: 1rem;
+}
+.danger-panel > p {
+  max-width: 780px;
+  margin: 0 0 20px;
+  line-height: 1.8;
+}
+.danger-panel .panel-heading > svg {
+  color: var(--cl-danger);
 }
 </style>

@@ -104,6 +104,27 @@ test('manages the player name without passwords and retains UUID and history', a
   await expect(page.getByRole('button', { name: 'Cambiar contraseña' })).toHaveCount(0)
 })
 
+test('deletes the account only after typing the exact player name', async ({ page }) => {
+  const api = await mockApi(page)
+  await login(page)
+  await page.locator('.danger-panel').getByRole('button', { name: 'Eliminar cuenta' }).click()
+  const modal = page.getByRole('dialog', { name: 'Eliminar cuenta' })
+  await expect(modal).toBeVisible()
+  const confirm = modal.getByRole('button', { name: 'Eliminar cuenta' })
+  await expect(confirm).toBeDisabled()
+  await modal.getByLabel(/Escribí/).fill('testplayer')
+  await expect(confirm).toBeDisabled()
+  await modal.getByLabel(/Escribí/).fill('TestPlayer')
+  await expect(confirm).toBeEnabled()
+  await confirm.click()
+  await expect(page).toHaveURL(/\/login/)
+  await expect(page.getByText('Tu cuenta y todos sus datos se eliminaron.')).toBeVisible()
+  expect(api.accountDeletes).toBe(1)
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('cubic-discord-session-v2')),
+  ).toBeNull()
+})
+
 test('redirects protected routes, retains themes and fits mobile screens', async ({ page }) => {
   await mockApi(page)
   await page.goto('/account/skin')
